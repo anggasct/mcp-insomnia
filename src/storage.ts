@@ -1,11 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { CollectionStructure } from './types.js';
+import { CollectionStructure, InsomniaExecution } from './types.js';
+
+const MAX_HISTORY_LENGTH = 20;
 
 export class PersistentStorage {
   private readonly storageDir: string;
   private readonly collectionsFile: string;
+
 
   constructor(customDir?: string) {
     this.storageDir = customDir ?? path.join(os.homedir(), '.mcp-insomnia');
@@ -92,6 +95,34 @@ export class PersistentStorage {
 
     const updated = updateFn(existing);
     collections.set(id, updated);
+    this.writeCollectionsToFile(collections);
+    return true;
+  }
+
+  public addExecution(collectionId: string, requestId: string, execution: InsomniaExecution): boolean {
+    const collections = this.readCollectionsFromFile();
+    const collection = collections.get(collectionId);
+
+    if (!collection) {
+      return false;
+    }
+
+    const request = collection.requests.find(r => r._id === requestId);
+    if (!request) {
+      return false;
+    }
+
+    if (!request.history) {
+      request.history = [];
+    }
+
+    request.history.unshift(execution);
+
+    if (request.history.length > MAX_HISTORY_LENGTH) {
+      request.history = request.history.slice(0, MAX_HISTORY_LENGTH);
+    }
+
+    collections.set(collectionId, collection);
     this.writeCollectionsToFile(collections);
     return true;
   }

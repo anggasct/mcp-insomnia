@@ -58,6 +58,7 @@ Or if installed from source:
 - `create_collection` - Create new collection/workspace
 - `list_collections` - List all collections
 - `export_collection` - Export collection to JSON format
+- `import_from_insomnia_export` - Import collections from a standard Insomnia V4 export file
 
 ### Folder Management  
 
@@ -78,10 +79,12 @@ Or if installed from source:
 ## Available Resources
 
 - `insomnia://collections` - List all collections
-- `insomnia://requests` - List all requests  
-- `insomnia://environments` - List environment variables
+- `insomnia://requests` - List all requests. Can be filtered by `?collectionId={id}`.
+- `insomnia://environments` - List environment variables. Can be filtered by `?collectionId={id}`.
 - `insomnia://collection/{id}` - Specific collection details
 - `insomnia://request/{id}` - Specific request details
+- `insomnia://request/{id}/history` - Get the execution history for a specific request
+- `insomnia://search?q={keyword}` - Search across all collections, folders, and requests.
 - `insomnia://stats` - Global statistics
 
 ## Usage Examples

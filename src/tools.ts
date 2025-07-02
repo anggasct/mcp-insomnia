@@ -16,6 +16,7 @@ import {
   RequestExecutionResult,
   SetEnvironmentVariableParams,
   UpdateRequestParams,
+  InsomniaExecution,
 } from './types.js';
 
 interface Tool {
@@ -23,6 +24,16 @@ interface Tool {
   description: string;
   inputSchema: any;
   handler: (request: CallToolRequest) => Promise<any>;
+}
+
+function normalizeHeaders(headers: any): Record<string, string> {
+  const normalized: Record<string, string> = {};
+  if (headers) {
+    for (const [key, value] of Object.entries(headers)) {
+      normalized[key] = String(value);
+    }
+  }
+  return normalized;
 }
 
 export function createInsomniaTools(): Tool[] {
@@ -254,16 +265,18 @@ export function createInsomniaTools(): Tool[] {
         const { requestId, environmentVariables = {} } = request.params.arguments as any;
 
         let targetRequest: InsomniaRequest | null = null;
+        let collectionId: string | null = null;
         const collections = storage.getAllCollections();
-        for (const collection of collections.values()) {
+        for (const [cId, collection] of collections.entries()) {
           const foundRequest = collection.requests.find(r => r._id === requestId);
           if (foundRequest) {
             targetRequest = foundRequest;
+            collectionId = cId;
             break;
           }
         }
 
-        if (!targetRequest) {
+        if (!targetRequest || !collectionId) {
           throw new Error(`Request with ID ${requestId} not found`);
         }
 
@@ -328,12 +341,27 @@ export function createInsomniaTools(): Tool[] {
           const result: RequestExecutionResult = {
             status: response.status,
             statusText: response.statusText,
-            headers: response.headers as Record<string, string>,
+            headers: normalizeHeaders(response.headers),
             data: response.data,
             duration,
             size: JSON.stringify(response.data).length,
             timestamp: new Date().toISOString(),
           };
+
+          const execution: InsomniaExecution = {
+            _id: `ex_${uuidv4().replace(/-/g, '')}`,
+            parentId: requestId,
+            timestamp: Date.now(),
+            response: {
+              statusCode: response.status,
+              statusMessage: response.statusText,
+              headers: normalizeHeaders(response.headers),
+              body: JSON.stringify(response.data),
+              duration,
+              size: result.size,
+            },
+          };
+          storage.addExecution(collectionId, requestId, execution);
 
           return {
             content: [
@@ -351,12 +379,31 @@ export function createInsomniaTools(): Tool[] {
             message: error.message,
             status: error.response?.status,
             statusText: error.response?.statusText,
-            headers: error.response?.headers,
+            headers: normalizeHeaders(error.response?.headers),
             data: error.response?.data,
             duration,
             timestamp: new Date().toISOString(),
           };
 
+          const execution: InsomniaExecution = {
+            _id: `ex_${uuidv4().replace(/-/g, '')}`,
+            parentId: requestId,
+            timestamp: Date.now(),
+            response: {
+              statusCode: error.response?.status ?? 0,
+              statusMessage: error.response?.statusText ?? error.message,
+              headers: normalizeHeaders(error.response?.headers),
+              body: JSON.stringify(error.response?.data),
+              duration,
+              size: JSON.stringify(error.response?.data).length,
+            },
+            error: {
+              message: error.message,
+              stack: error.stack,
+            },
+          };
+          storage.addExecution(collectionId, requestId, execution);
+          
           return {
             content: [
               {
@@ -647,5 +694,91 @@ export function createInsomniaTools(): Tool[] {
         }
       },
     },
-  ];
+
+    {
+      name: 'import_from_insomnia_export',
+      description: 'Import collections from a standard Insomnia V4 export file',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          filePath: { type: 'string', description: 'The absolute path to the Insomnia export file' },
+        },
+        required: ['filePath'],
+      },
+      handler: async (request) => {
+        const { filePath } = request.params.arguments as any;
+
+        if (!fs.existsSync(filePath)) {
+          throw new Error(`File not found at path: ${filePath}`);
+        }
+
+        const fileContent = fs.readFileSync(filePath, 'utf-8');
+        const data = JSON.parse(fileContent) as InsomniaCollection;
+
+        if (data._type !== 'export' || data.__export_format !== 4) {
+          throw new Error('Invalid Insomnia V4 export file format.');
+        }
+
+        const allResources = data.resources || [];
+        const workspaces = allResources.filter(r => r._type === 'workspace') as InsomniaWorkspace[];
+
+        if (workspaces.length === 0) {
+          throw new Error('No workspaces found in the export file.');
+        }
+
+        let importedCount = 0;
+        for (const workspace of workspaces) {
+          const structure: CollectionStructure = {
+            workspace,
+            folders: [],
+            requests: [],
+            environments: [],
+          };
+
+          const allChildrenIds = new Set<string>([workspace._id]);
+          const resourcesInWorkspace = allResources.filter(r => r.parentId === workspace._id);
+          
+          const folderIds = new Set<string>();
+          resourcesInWorkspace.forEach(r => {
+            if (r._type === 'request_group') {
+              folderIds.add(r._id);
+              allChildrenIds.add(r._id);
+            }
+          });
+
+          allResources.forEach(r => {
+            if (!r.parentId || !allChildrenIds.has(r.parentId)) return;
+
+            switch (r._type) {
+              case 'request_group':
+                structure.folders.push(r as InsomniaRequestGroup);
+                break;
+              case 'request':
+                structure.requests.push(r as InsomniaRequest);
+                break;
+              case 'environment':
+                // Environments can be at the root of the workspace
+                if (r.parentId === workspace._id) {
+                  structure.environments.push(r as InsomniaEnvironment);
+                }
+                break;
+            }
+          });
+
+          storage.saveCollection(workspace._id, structure);
+          importedCount++;
+        }
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Successfully imported ${importedCount} collection(s) from ${filePath}`,
+            },
+          ],
+        };
+      },
+    },
+
+    ];
 }

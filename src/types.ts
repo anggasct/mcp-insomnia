@@ -40,6 +40,25 @@ export interface InsomniaRequest extends InsomniaResource {
   settingEncodeUrl?: boolean;
   settingRebuildPath?: boolean;
   settingFollowRedirects?: 'global' | 'on' | 'off';
+  history?: InsomniaExecution[];
+}
+
+export interface InsomniaExecution {
+  _id: string;
+  parentId: string; // The ID of the request
+  timestamp: number;
+  response: {
+    statusCode: number;
+    statusMessage: string;
+    headers: Record<string, string | string[] | undefined>;
+    body: string;
+    duration: number;
+    size: number;
+  };
+  error?: {
+    message: string;
+    stack?: string;
+  };
 }
 
 export interface InsomniaEnvironment extends InsomniaResource {

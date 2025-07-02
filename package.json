@@ -1,6 +1,6 @@
 {
   "name": "mcp-insomnia",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "MCP server for making HTTP requests and managing API collections",
   "main": "dist/index.js",
   "type": "module",
@@ -17,20 +17,28 @@
     "rest",
     "graphql"
   ],
-  "author": "Your Name",
+  "author": "angga permana <angga@kirana.dev>",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/anggasct/mcp-insomnia.git"
+  },
+  "files": [
+    "dist"
+  ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@modelcontextprotocol/sdk": "1.13.3",
     "axios": "^1.6.0",
-    "uuid": "^9.0.0"
+    "uuid": "10.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "@types/uuid": "^9.0.0",
+    "@types/uuid": "10.0.0",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0"
   },
   "bin": {
     "mcp-insomnia": "./dist/index.js"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }
