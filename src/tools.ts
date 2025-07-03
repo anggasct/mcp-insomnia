@@ -2,6 +2,7 @@ import { CallToolRequest } from '@modelcontextprotocol/sdk/types.js';
 import axios from 'axios';
 import * as fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
+import { HTTPSnippet } from 'httpsnippet';
 import { storage } from './storage.js';
 import {
   CollectionStructure,
@@ -34,6 +35,28 @@ function normalizeHeaders(headers: any): Record<string, string> {
     }
   }
   return normalized;
+}
+
+function convertInsomniaRequestToHar(request: InsomniaRequest): any {
+  const har: any = {
+    method: request.method,
+    url: request.url,
+    headers: request.headers.map(h => ({ name: h.name, value: h.value })),
+    queryString: request.parameters.map(p => ({ name: p.name, value: p.value })),
+    httpVersion: 'HTTP/1.1',
+    cookies: [],
+    headersSize: -1,
+    bodySize: -1,
+  };
+
+  if (request.body && request.body.text) {
+    har.postData = {
+      mimeType: request.body.mimeType || 'application/json',
+      text: request.body.text,
+    };
+  }
+
+  return har;
 }
 
 export function createInsomniaTools(): Tool[] {
@@ -403,7 +426,7 @@ export function createInsomniaTools(): Tool[] {
             },
           };
           storage.addExecution(collectionId, requestId, execution);
-          
+
           return {
             content: [
               {
@@ -737,7 +760,7 @@ export function createInsomniaTools(): Tool[] {
 
           const allChildrenIds = new Set<string>([workspace._id]);
           const resourcesInWorkspace = allResources.filter(r => r.parentId === workspace._id);
-          
+
           const folderIds = new Set<string>();
           resourcesInWorkspace.forEach(r => {
             if (r._type === 'request_group') {
@@ -780,5 +803,63 @@ export function createInsomniaTools(): Tool[] {
       },
     },
 
-    ];
+    {
+      name: 'generate_code_snippet',
+      description: 'Generate a code snippet for a request in various languages/frameworks',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          requestId: { type: 'string', description: 'ID of the request to generate snippet for' },
+          target: {
+            type: 'string',
+            description: 'Target language for the snippet (e.g., "javascript", "python", "shell")',
+            enum: [
+              "c", "clojure", "csharp", "go", "http", "java", "javascript",
+              "kotlin", "node", "objc", "ocaml", "php", "powershell", "python",
+              "ruby", "shell", "swift"
+            ]
+          },
+          client: {
+            type: 'string',
+            description: 'Optional: specify a client for the target language (e.g., "axios" for javascript, "curl" for shell)',
+          }
+        },
+        required: ['requestId', 'target'],
+      },
+      handler: async (request) => {
+        const { requestId, target, client } = request.params.arguments as any;
+
+        let targetRequest: InsomniaRequest | null = null;
+        const collections = storage.getAllCollections();
+        for (const [, collection] of collections.entries()) {
+          const foundRequest = collection.requests.find(r => r._id === requestId);
+          if (foundRequest) {
+            targetRequest = foundRequest;
+            break;
+          }
+        }
+
+        if (!targetRequest) {
+          throw new Error(`Request with ID ${requestId} not found`);
+        }
+
+        const harRequest = convertInsomniaRequestToHar(targetRequest);
+        const snippet = new HTTPSnippet(harRequest);
+
+        try {
+          const code = snippet.convert(target, client);
+          return {
+            content: [
+              {
+                type: 'text',
+                text: code,
+              },
+            ],
+          };
+        } catch (error: any) {
+          throw new Error(`Failed to generate code snippet for target "${target}" with client "${client || 'default'}": ${error.message}`);
+        }
+      },
+    },
+  ];
 }

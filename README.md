@@ -2,31 +2,43 @@
 
 MCP-Insomnia is an MCP (Model Context Protocol) server that enables AI agents to create and manage API collections in Insomnia-compatible format. This server provides tools and resources for managing collections, requests, and environments that can be exported to Insomnia.
 
-## Installation
+## Installation and Usage
 
 ### Prerequisites
 
 - Node.js 18+
 - npm or yarn
 
-### Install from NPM
+There are three ways to use `mcp-insomnia`.
+
+### 1. Run with NPX (Recommended)
+
+You can run `mcp-insomnia` directly using `npx` without a global installation.
+
+**Configuration:**
+
+```json
+{
+  "mcpServers": {
+    "insomnia": {
+      "command": "npx",
+      "args": ["mcp-insomnia"]
+    }
+  }
+}
+```
+
+### 2. Install Globally from NPM
+
+Install the package globally using npm.
+
+**Installation:**
 
 ```bash
 npm install -g mcp-insomnia
 ```
 
-### Install from Source
-
-```bash
-git clone https://github.com/anggasct/mcp-insomnia.git
-cd mcp-insomnia
-npm install
-npm run build
-```
-
-### Add to MCP Configuration
-
-Add to your MCP client configuration:
+**Configuration:**
 
 ```json
 {
@@ -38,7 +50,20 @@ Add to your MCP client configuration:
 }
 ```
 
-Or if installed from source:
+### 3. Install from Source
+
+Clone the repository and build the project.
+
+**Installation:**
+
+```bash
+git clone https://github.com/anggasct/mcp-insomnia.git
+cd mcp-insomnia
+npm install
+npm run build
+```
+
+**Configuration:**
 
 ```json
 {
@@ -70,6 +95,7 @@ Or if installed from source:
 - `update_request` - Update existing request
 - `delete_request` - Delete request
 - `execute_request` - Execute request and view response
+- `generate_code_snippet` - Generate a code snippet for a request in various languages/frameworks
 
 ### Environment Management
 
@@ -114,6 +140,12 @@ Set environment variable "baseUrl" with value "https://api.example.com" for "API
 
 ```
 Execute "Get Users" request using the configured environment variables
+```
+
+### Generate Code Snippet
+
+```
+Generate a code snippet for request "Get Users" in "javascript"
 ```
 
 ## Data Storage
