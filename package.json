@@ -1,6 +1,6 @@
 {
   "name": "mcp-insomnia",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server for making HTTP requests and managing API collections",
   "main": "dist/index.js",
   "type": "module",
