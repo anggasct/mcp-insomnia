@@ -1,6 +1,6 @@
 {
   "name": "mcp-insomnia",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "MCP server for making HTTP requests and managing API collections",
   "main": "dist/index.js",
   "type": "module",
@@ -8,7 +8,13 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
-    "watch": "tsx watch src/index.ts"
+    "watch": "tsx watch src/index.ts",
+    "lint": "tsc --noEmit",
+    "lint:strict": "tsc --noEmit --strict",
+    "lint:eslint": "eslint src/",
+    "lint:fix": "eslint src/ --fix",
+    "format": "prettier --write \"src/**/*.{ts,js,json,md}\"",
+    "typecheck": "tsc --noEmit --pretty"
   },
   "keywords": [
     "mcp",
@@ -35,11 +41,15 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/uuid": "10.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.52.0",
+    "@typescript-eslint/parser": "^8.52.0",
+    "eslint": "^9.39.2",
+    "prettier": "^3.7.4",
     "tsx": "^4.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.52.0"
   },
   "bin": {
-    "mcp-insomnia": "./dist/index.js"
-  },
-  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+    "mcp-insomnia": "dist/index.js"
+  }
 }

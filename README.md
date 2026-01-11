@@ -83,7 +83,7 @@ npm run build
 - `create_collection` - Create new collection/workspace
 - `list_collections` - List all collections
 - `export_collection` - Export collection to JSON format
-- `import_from_insomnia_export` - Import collections from a standard Insomnia V4 export file
+
 
 ### Folder Management  
 
@@ -96,6 +96,26 @@ npm run build
 - `delete_request` - Delete request
 - `execute_request` - Execute request and view response
 - `generate_code_snippet` - Generate a code snippet for a request in various languages/frameworks
+
+### Import Tools
+
+- `import_from_curl` - Parse cURL command into a request
+- `import_from_postman` - Import Postman Collection (v2.1) JSON
+- `import_from_openapi` - Import OpenAPI/Swagger (v3.0) JSON
+- `import_from_insomnia_export` - Import collections from a standard Insomnia V4 export file
+
+### Insomnia Direct Integration (NeDB)
+
+Interact directly with the local Insomnia application database (macOS).
+
+- `list_insomnia_projects` - List all projects/teams from Insomnia
+- `list_insomnia_collections` - List all workspaces/collections from Insomnia
+- `get_insomnia_collection` - Get full details of a specific Insomnia workspace
+- `get_insomnia_request` - Get full details of a specific Insomnia request
+- `sync_from_insomnia` - Import a workspace from Insomnia to MCP
+- `sync_all_from_insomnia` - Import all workspaces from Insomnia to MCP
+- `sync_to_insomnia` - Export an MCP collection back to Insomnia
+- `execute_insomnia_request` - Execute a request directly from Insomnia (with env support)
 
 ### Environment Management
 
@@ -118,13 +138,13 @@ npm run build
 ### Create Collection
 
 ```
-Create a new collection named "API Testing" for testing endpoints
+Create a new Insomnia collection named "API Testing" for testing endpoints
 ```
 
 ### Add Request
 
 ```
-Add GET request to "API Testing" collection with:
+Add GET request to "API Testing" Insomnia collection with:
 - Name: Get Users
 - URL: https://jsonplaceholder.typicode.com/users
 - Headers: Content-Type: application/json
@@ -133,7 +153,7 @@ Add GET request to "API Testing" collection with:
 ### Set Environment Variable
 
 ```
-Set environment variable "baseUrl" with value "https://api.example.com" for "API Testing" collection
+Set Insomnia environment variable "baseUrl" with value "https://api.example.com" for "API Testing" collection
 ```
 
 ### Execute Request
@@ -145,12 +165,30 @@ Execute "Get Users" request using the configured environment variables
 ### Generate Code Snippet
 
 ```
-Generate a code snippet for request "Get Users" in "javascript"
+Generate a code snippet for Insomnia request "Get Users" in "javascript"
 ```
 
 ## Data Storage
 
-Data is stored in `~/.mcp-insomnia/collections.json` in JSON format.
+Data is stored in two locations:
+1. **MCP Storage** (Staging): `~/.mcp-insomnia/collections.json`
+   - Acts as a **Draft/Staging Area**.
+   - Changes here do NOT affect the Insomnia App until synced.
+   - Ideal for generating new collections, importing from OpenAPI, or mass-refactoring.
+
+2. **Insomnia Storage** (Live): `~/Library/Application Support/Insomnia` (NeDB)
+   - The **Live Database** used by the Insomnia Application.
+   - Changes here are immediately visible in the App (may require restart).
+
+## Recommended Workflow
+
+**Scenario A: Creating/Modifying Content**
+1. **Import/Fetch**: Pull data to Staging (`sync_from_insomnia` or `import_from_openapi`).
+2. **Edit**: Modify requests/folders using MCP tools (`create_request`, `update_request`).
+3. **Publish**: Sync changes back to Live (`sync_to_insomnia`).
+
+**Scenario B: Running Existing Requests**
+- Use `execute_insomnia_request` to run requests directly from the Live database without syncing.
 
 ## License
 
