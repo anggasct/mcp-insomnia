@@ -251,6 +251,64 @@ export class InsomniaStorage {
         return false;
     }
 
+    getWorkspaceProjectId(workspaceId: string): string | null {
+        const workspaces = this.getAllWorkspaces();
+        const workspace = workspaces.find((w) => w._id === workspaceId);
+        return workspace?.parentId || null;
+    }
+
+    getGlobalEnvironment(projectId: string): InsomniaEnvironmentRaw | null {
+        if (!projectId) return null;
+
+        const workspaces = this.getAllWorkspaces();
+        const globalWorkspace = workspaces.find((w) => w.parentId === projectId && w.scope === 'environment');
+
+        if (!globalWorkspace) return null;
+
+        const environments = this.getAllEnvironments();
+        return environments.find((e) => e.parentId === globalWorkspace._id) || null;
+    }
+
+    getBaseEnvironment(workspaceId: string): InsomniaEnvironmentRaw | null {
+        const environments = this.getAllEnvironments();
+        return environments.find((e) => e.parentId === workspaceId) || null;
+    }
+
+    getAncestorChain(entityId: string): Array<{ id: string; type: 'workspace' | 'folder' }> {
+        const chain: Array<{ id: string; type: 'workspace' | 'folder' }> = [];
+        const allFolders = this.getAllRequestGroups();
+        const allWorkspaces = this.getAllWorkspaces();
+
+        let currentId = entityId;
+        const visited = new Set<string>();
+
+        while (currentId && !visited.has(currentId)) {
+            visited.add(currentId);
+
+            if (currentId.startsWith('wrk_')) {
+                const workspace = allWorkspaces.find((w) => w._id === currentId);
+                if (workspace) {
+                    chain.unshift({ id: currentId, type: 'workspace' });
+                }
+                break;
+            }
+
+            if (currentId.startsWith('fld_')) {
+                const folder = allFolders.find((f) => f._id === currentId);
+                if (folder) {
+                    chain.unshift({ id: currentId, type: 'folder' });
+                    currentId = folder.parentId;
+                } else {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+
+        return chain;
+    }
+
     private convertWorkspace(raw: InsomniaWorkspaceRaw): InsomniaWorkspace {
         return {
             _id: raw._id,

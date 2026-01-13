@@ -46,6 +46,10 @@ export interface PostmanBody {
             language?: string;
         };
     };
+    graphql?: {
+        query: string;
+        variables?: string;
+    };
 }
 
 export interface PostmanFormData {
@@ -228,6 +232,18 @@ function convertPostmanRequest(
                             fileName: p.src,
                         })),
                 };
+                break;
+            case 'graphql':
+                if (request.body.graphql) {
+                    body = {
+                        mimeType: 'application/graphql',
+                        text: '', // Standard Insomnia stores the query in 'text', but we use a structured 'graphql' field for better isolation of query and variables.
+                        graphql: {
+                            query: request.body.graphql.query,
+                            variables: request.body.graphql.variables,
+                        },
+                    };
+                }
                 break;
         }
     }

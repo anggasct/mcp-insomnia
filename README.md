@@ -171,25 +171,29 @@ Generate a code snippet for Insomnia request "Get Users" in "javascript"
 ## Data Storage
 
 Data is stored in two locations:
-1. **MCP Storage** (Staging): `~/.mcp-insomnia/collections.json`
-   - Acts as a **Draft/Staging Area**.
-   - Changes here do NOT affect the Insomnia App until synced.
-   - Ideal for generating new collections, importing from OpenAPI, or mass-refactoring.
+1. **MCP Storage**: `~/.mcp-insomnia/collections.json`
+   - Working area for building/editing collections before syncing
+   - Changes here do NOT affect the Insomnia App until synced
+   - Ideal for generating new collections, importing from OpenAPI, or mass-refactoring
 
-2. **Insomnia Storage** (Live): `~/Library/Application Support/Insomnia` (NeDB)
-   - The **Live Database** used by the Insomnia Application.
-   - Changes here are immediately visible in the App (may require restart).
+2. **Insomnia App Storage**: `~/Library/Application Support/Insomnia` (NeDB)
+   - The database used by Insomnia App
+   - Changes here are visible in the App (may require restart)
 
 ## Recommended Workflow
 
 **Scenario A: Creating/Modifying Content**
-1. **Import/Fetch**: Pull data to Staging (`sync_from_insomnia` or `import_from_openapi`).
-2. **Edit**: Modify requests/folders using MCP tools (`create_request`, `update_request`).
-3. **Publish**: Sync changes back to Live (`sync_to_insomnia`).
+1. **Import/Fetch**: Pull data from Insomnia (`sync_from_insomnia` or `import_from_openapi`)
+2. **Edit**: Modify requests/folders using MCP tools (`create_request`, `update_request`)
+3. **Publish**: Sync changes back to Insomnia (`sync_to_insomnia`)
 
 **Scenario B: Running Existing Requests**
-- Use `execute_insomnia_request` to run requests directly from the Live database without syncing.
+- Use `execute_insomnia_request` to run requests directly from Insomnia App without syncing
 
 ## License
 
-MIT License
+[MIT License](LICENSE)
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release history.

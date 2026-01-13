@@ -24,6 +24,10 @@ export interface InsomniaRequestBody {
     text?: string;
     params?: InsomniaFormParameter[];
     fileName?: string;
+    graphql?: {
+        query: string;
+        variables?: string; // JSON string
+    };
 }
 
 export interface InsomniaFormParameter {

@@ -84,7 +84,7 @@ export const collectionResources: Resource[] = [
                             request.parentId === collectionId
                                 ? 'Root'
                                 : (structure.folders.find((f: InsomniaRequestGroup) => f._id === request.parentId)
-                                    ?.name ?? 'Unknown'),
+                                      ?.name ?? 'Unknown'),
                         hasAuth: !!request.authentication,
                         authType: request.authentication?.type,
                     })),

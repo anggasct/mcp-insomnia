@@ -432,37 +432,67 @@ export const insomniaTools: Tool[] = [
                 })),
                 body: rawReq.body.text
                     ? {
-                          mimeType: rawReq.body.mimeType,
-                          text: rawReq.body.text,
-                      }
+                        mimeType: rawReq.body.mimeType,
+                        text: rawReq.body.text,
+                    }
                     : undefined,
                 modified: rawReq.modified,
                 created: rawReq.created,
             };
 
             let environmentVariables: Record<string, string | number | boolean> = {};
+            const warnings: Array<{ type: string; folderId?: string; message: string }> = [];
 
-            if (environmentId) {
-                const allEnvs = insomniaStorage.getAllEnvironments();
-                const env = allEnvs.find((e) => e._id === environmentId);
-                if (env) {
-                    environmentVariables = { ...env.data };
-                }
-            } else {
-                const allEnvs = insomniaStorage.getAllEnvironments();
+            // Step 1: Get ancestor chain and workspace context
+            const ancestors = insomniaStorage.getAncestorChain(rawReq.parentId);
+            const workspaceAncestor = ancestors.find((a) => a.type === 'workspace');
+            const workspaceId = workspaceAncestor?.id || (rawReq.parentId.startsWith('wrk_') ? rawReq.parentId : null);
 
-                const workspaceId = rawReq.parentId.startsWith('wrk_')
-                    ? rawReq.parentId
-                    : insomniaStorage.getAllRequestGroups().find((f) => f._id === rawReq.parentId)?.parentId;
-
-                if (workspaceId) {
-                    const baseEnv = allEnvs.find((e) => e.parentId === workspaceId);
-                    if (baseEnv) {
-                        environmentVariables = { ...baseEnv.data };
+            if (workspaceId) {
+                // Step 2: Merge Global Environment
+                const projectId = insomniaStorage.getWorkspaceProjectId(workspaceId);
+                if (projectId) {
+                    const globalEnv = insomniaStorage.getGlobalEnvironment(projectId);
+                    if (globalEnv?.data) {
+                        Object.assign(environmentVariables, globalEnv.data);
                     }
+                }
+
+                // Step 3: Merge Base Environment
+                const baseEnv = insomniaStorage.getBaseEnvironment(workspaceId);
+                if (baseEnv?.data) {
+                    Object.assign(environmentVariables, baseEnv.data);
                 }
             }
 
+            // Step 4: Merge Sub Environment (if specified)
+            if (environmentId) {
+                const allEnvs = insomniaStorage.getAllEnvironments();
+                const subEnv = allEnvs.find((e) => e._id === environmentId);
+                if (subEnv?.data) {
+                    Object.assign(environmentVariables, subEnv.data);
+                }
+            }
+
+            // Step 5: Merge Folder Environments (root → leaf order)
+            const folderIds = ancestors.filter((a) => a.type === 'folder').map((a) => a.id);
+            const allFolders = insomniaStorage.getAllRequestGroups();
+            for (const folderId of folderIds) {
+                const folder = allFolders.find((f) => f._id === folderId);
+                if (!folder) {
+                    warnings.push({
+                        type: 'FOLDER_NOT_FOUND',
+                        folderId,
+                        message: `Folder ${folderId} not found in hierarchy`,
+                    });
+                    continue;
+                }
+                if (folder.environment && Object.keys(folder.environment).length > 0) {
+                    Object.assign(environmentVariables, folder.environment);
+                }
+            }
+
+            // Step 6: Apply overrides
             if (overrideVariables) {
                 Object.assign(environmentVariables, overrideVariables);
             }
@@ -484,18 +514,41 @@ export const insomniaTools: Tool[] = [
             });
 
             let processedBody: string | Record<string, unknown> | undefined = undefined;
-            if (targetRequest.body?.text) {
-                processedBody = targetRequest.body.text;
-                Object.entries(environmentVariables).forEach(([key, value]) => {
-                    if (typeof processedBody === 'string') {
-                        processedBody = processedBody.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-                    }
-                });
+            if (targetRequest.body) {
+                if (targetRequest.body.graphql) {
+                    const gql = targetRequest.body.graphql;
+                    let variablesStr = gql.variables || '{}';
+                    Object.entries(environmentVariables).forEach(([key, value]) => {
+                        variablesStr = variablesStr.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
+                    });
 
-                if (targetRequest.body.mimeType === 'application/json') {
+                    let variables = {};
                     try {
-                        processedBody = JSON.parse(processedBody) as Record<string, unknown>;
-                    } catch {}
+                        variables = JSON.parse(variablesStr);
+                    } catch { }
+
+                    let query = gql.query;
+                    Object.entries(environmentVariables).forEach(([key, value]) => {
+                        query = query.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
+                    });
+
+                    processedBody = {
+                        query: query,
+                        variables: variables,
+                    };
+                } else if (targetRequest.body.text) {
+                    processedBody = targetRequest.body.text;
+                    Object.entries(environmentVariables).forEach(([key, value]) => {
+                        if (typeof processedBody === 'string') {
+                            processedBody = processedBody.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
+                        }
+                    });
+
+                    if (targetRequest.body.mimeType === 'application/json' || targetRequest.body.mimeType === 'application/graphql') {
+                        try {
+                            processedBody = JSON.parse(processedBody) as Record<string, unknown>;
+                        } catch { }
+                    }
                 }
             }
 
@@ -518,7 +571,7 @@ export const insomniaTools: Tool[] = [
                 });
 
                 const duration = Date.now() - startTime;
-                const result = {
+                const result: Record<string, unknown> = {
                     success: true,
                     request: {
                         name: targetRequest.name,
@@ -534,6 +587,10 @@ export const insomniaTools: Tool[] = [
                         size: JSON.stringify(response.data).length,
                     },
                 };
+
+                if (warnings.length > 0) {
+                    result.warnings = warnings;
+                }
 
                 return {
                     content: [

@@ -297,7 +297,29 @@ export const requestTools: Tool[] = [
 
                 let processedBody: string | Record<string, unknown> | undefined = undefined;
                 if (targetRequest.body) {
-                    if (targetRequest.body.text) {
+                    if (targetRequest.body.graphql) {
+                        const gql = targetRequest.body.graphql;
+                        let variablesStr = gql.variables || '{}';
+                        Object.entries(environmentVariables).forEach(([key, value]) => {
+                            variablesStr = variablesStr.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
+                        });
+
+                        let variables = {};
+                        try {
+                            variables = JSON.parse(variablesStr);
+                        } catch { }
+
+                        let query = gql.query;
+                        Object.entries(environmentVariables).forEach(([key, value]) => {
+                            query = query.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
+                        });
+
+                        processedBody = {
+                            query: query,
+                            variables: variables,
+                        };
+
+                    } else if (targetRequest.body.text) {
                         processedBody = targetRequest.body.text;
                         Object.entries(environmentVariables).forEach(([key, value]) => {
                             if (typeof processedBody === 'string') {
@@ -308,7 +330,7 @@ export const requestTools: Tool[] = [
                         if (targetRequest.body.mimeType === 'application/json') {
                             try {
                                 processedBody = JSON.parse(processedBody) as Record<string, unknown>;
-                            } catch {}
+                            } catch { }
                         }
                     }
                 }
