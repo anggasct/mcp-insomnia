@@ -33,7 +33,7 @@
     "dist"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.13.3",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "axios": "^1.6.0",
     "httpsnippet": "^3.0.9",
     "uuid": "10.0.0"
@@ -51,5 +51,10 @@
   },
   "bin": {
     "mcp-insomnia": "dist/index.js"
+  },
+  "overrides": {
+    "httpsnippet": {
+      "form-data": "^4.0.5"
+    }
   }
 }
