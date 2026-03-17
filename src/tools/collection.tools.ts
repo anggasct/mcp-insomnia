@@ -8,6 +8,8 @@ import type {
     CollectionStructure,
     InsomniaCollection,
 } from '../types/collection.js';
+import type { InsomniaRequest } from '../types/request.js';
+import type { InsomniaEnvironment } from '../types/environment.js';
 import * as fs from 'fs';
 
 export const collectionTools: Tool[] = [
@@ -87,6 +89,86 @@ export const collectionTools: Tool[] = [
                         text: JSON.stringify(result, null, 2),
                     },
                 ],
+            };
+        },
+    },
+
+    {
+        name: 'get_collection_detail',
+        description: 'Get full details and statistics of a specific collection',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                collectionId: { type: 'string', description: 'ID of the collection' },
+            },
+            required: ['collectionId'],
+        },
+        handler: async (request) => {
+            const { collectionId } = request.params.arguments as { collectionId: string };
+            const structure = storage.getCollection(collectionId);
+
+            if (!structure) {
+                throw new Error(`Collection with ID ${collectionId} not found`);
+            }
+
+            const result = {
+                workspace: {
+                    id: structure.workspace._id,
+                    name: structure.workspace.name,
+                    description: structure.workspace.description,
+                    scope: structure.workspace.scope,
+                    created: new Date(structure.workspace.created).toISOString(),
+                    modified: new Date(structure.workspace.modified).toISOString(),
+                },
+                structure: {
+                    folders: structure.folders.map((folder: InsomniaRequestGroup) => ({
+                        id: folder._id,
+                        name: folder.name,
+                        description: folder.description,
+                        parentId: folder.parentId,
+                        requestCount: structure.requests.filter((r: InsomniaRequest) => r.parentId === folder._id).length,
+                    })),
+                    requests: structure.requests.map((req: InsomniaRequest) => ({
+                        id: req._id,
+                        name: req.name,
+                        method: req.method,
+                        url: req.url,
+                        parentId: req.parentId,
+                        parentName:
+                            req.parentId === collectionId
+                                ? 'Root'
+                                : (structure.folders.find((f: InsomniaRequestGroup) => f._id === req.parentId)?.name ??
+                                  'Unknown'),
+                        hasAuth: !!req.authentication,
+                        authType: req.authentication?.type,
+                    })),
+                    environments: structure.environments.map((env: InsomniaEnvironment) => ({
+                        id: env._id,
+                        name: env.name,
+                        variableCount: Object.keys(env.data).length,
+                    })),
+                },
+                statistics: {
+                    totalRequests: structure.requests.length,
+                    totalFolders: structure.folders.length,
+                    totalEnvironments: structure.environments.length,
+                    methodBreakdown: structure.requests.reduce((acc: Record<string, number>, req: InsomniaRequest) => {
+                        acc[req.method] = (acc[req.method] || 0) + 1;
+                        return acc;
+                    }, {}),
+                    authenticationBreakdown: structure.requests.reduce(
+                        (acc: Record<string, number>, req: InsomniaRequest) => {
+                            const authType = req.authentication?.type ?? 'none';
+                            acc[authType] = (acc[authType] || 0) + 1;
+                            return acc;
+                        },
+                        {},
+                    ),
+                },
+            };
+
+            return {
+                content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
             };
         },
     },

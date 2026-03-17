@@ -1,6 +1,18 @@
 # Changelog
 
-## [Unreleased]
+## [0.5.0] - 2026-03-17
+
+### Added
+- `INSOMNIA_DATA_DIR` environment variable for custom Insomnia data path
+- Auto-detect Flatpak installation on Linux (`~/.var/app/rest.insomnia.Insomnia/config/Insomnia`)
+- Improved error messages showing all checked paths when Insomnia is not found
+- New tools: `get_collection_detail`, `list_requests`, `get_request`, `get_request_history`, `search`, `get_stats`
+
+### Changed
+- All MCP resources converted to tools for better client compatibility
+
+### Removed
+- MCP resource layer (`insomnia://` resources)
 
 ---
 

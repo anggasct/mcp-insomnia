@@ -7,26 +7,42 @@ import type { InsomniaEnvironment } from '../types/environment.js';
 
 export class InsomniaStorage {
     private readonly insomniaDir: string;
+    private readonly checkedPaths: string[];
 
     constructor(customPath?: string) {
-        this.insomniaDir = customPath || this.detectInsomniaPath();
+        const envPath = process.env.INSOMNIA_DATA_DIR;
+        if (customPath) {
+            this.insomniaDir = customPath;
+            this.checkedPaths = [customPath];
+        } else if (envPath) {
+            this.insomniaDir = envPath;
+            this.checkedPaths = [envPath];
+        } else {
+            const { selected, candidates } = this.detectInsomniaPath();
+            this.insomniaDir = selected;
+            this.checkedPaths = candidates;
+        }
     }
 
-    private detectInsomniaPath(): string {
+    private detectInsomniaPath(): { selected: string; candidates: string[] } {
         const platform = process.platform;
-        let basePath: string;
+        const candidates: string[] = [];
 
         if (platform === 'darwin') {
-            basePath = path.join(os.homedir(), 'Library', 'Application Support', 'Insomnia');
+            candidates.push(path.join(os.homedir(), 'Library', 'Application Support', 'Insomnia'));
         } else if (platform === 'linux') {
-            basePath = path.join(os.homedir(), '.config', 'Insomnia');
+            candidates.push(
+                path.join(os.homedir(), '.config', 'Insomnia'),
+                path.join(os.homedir(), '.var', 'app', 'rest.insomnia.Insomnia', 'config', 'Insomnia'),
+            );
         } else if (platform === 'win32') {
-            basePath = path.join(process.env.APPDATA || '', 'Insomnia');
+            candidates.push(path.join(process.env.APPDATA || '', 'Insomnia'));
         } else {
             throw new Error(`Unsupported platform: ${platform}`);
         }
 
-        return basePath;
+        const selected = candidates.find((p) => fs.existsSync(p)) || candidates[0];
+        return { selected, candidates };
     }
 
     isInsomniaInstalled(): boolean {
@@ -35,6 +51,11 @@ export class InsomniaStorage {
 
     getInsomniaPath(): string {
         return this.insomniaDir;
+    }
+
+    getNotInstalledMessage(): string {
+        const pathsList = this.checkedPaths.map((p) => `  - ${p}`).join('\n');
+        return `Insomnia data directory not found. Checked:\n${pathsList}\n\nSet INSOMNIA_DATA_DIR environment variable to specify a custom path.`;
     }
 
     private readNeDB<T>(filename: string): T[] {

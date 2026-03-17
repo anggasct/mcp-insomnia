@@ -1,32 +1,30 @@
 import { storage } from '../storage/index.js';
-import type { Resource } from '../types/resource.js';
+import type { Tool } from '../types/tool.js';
 import type { InsomniaRequest } from '../types/request.js';
 import type { InsomniaEnvironment } from '../types/environment.js';
 import type { SearchResult, ActivityItem } from '../types/common.js';
 
-export const searchResources: Resource[] = [
+export const searchTools: Tool[] = [
     {
-        uri: 'insomnia://search',
-        name: 'Search',
-        description: 'Search for a keyword across all collections, folders, and requests. Use with ?q=keyword',
-        mimeType: 'application/json',
+        name: 'search',
+        description: 'Search for a keyword across all collections, folders, and requests',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                keyword: { type: 'string', description: 'Search keyword' },
+            },
+            required: ['keyword'],
+        },
         handler: async (request) => {
-            const uri = request.params.uri;
-            const url = new URL(uri);
-            const keyword = url.searchParams.get('q');
-
-            if (!keyword) {
-                throw new Error('Search keyword must be provided with ?q=');
-            }
-
+            const { keyword } = request.params.arguments as { keyword: string };
             const searchResults: SearchResult[] = [];
             const collections = storage.getAllCollections();
-            const lowerCaseKeyword = keyword.toLowerCase();
+            const lowerKeyword = keyword.toLowerCase();
 
             for (const [collectionId, structure] of collections.entries()) {
                 if (
-                    structure.workspace.name.toLowerCase().includes(lowerCaseKeyword) ||
-                    (structure.workspace.description || '').toLowerCase().includes(lowerCaseKeyword)
+                    structure.workspace.name.toLowerCase().includes(lowerKeyword) ||
+                    (structure.workspace.description || '').toLowerCase().includes(lowerKeyword)
                 ) {
                     searchResults.push({
                         type: 'Collection',
@@ -38,8 +36,8 @@ export const searchResources: Resource[] = [
 
                 for (const folder of structure.folders) {
                     if (
-                        folder.name.toLowerCase().includes(lowerCaseKeyword) ||
-                        (folder.description || '').toLowerCase().includes(lowerCaseKeyword)
+                        folder.name.toLowerCase().includes(lowerKeyword) ||
+                        (folder.description || '').toLowerCase().includes(lowerKeyword)
                     ) {
                         searchResults.push({
                             type: 'Folder',
@@ -53,11 +51,10 @@ export const searchResources: Resource[] = [
 
                 for (const req of structure.requests) {
                     let matchReason = '';
-                    if (req.name.toLowerCase().includes(lowerCaseKeyword)) matchReason = 'Name';
-                    else if ((req.description || '').toLowerCase().includes(lowerCaseKeyword))
-                        matchReason = 'Description';
-                    else if (req.url.toLowerCase().includes(lowerCaseKeyword)) matchReason = 'URL';
-                    else if (req.method.toLowerCase().includes(lowerCaseKeyword)) matchReason = 'Method';
+                    if (req.name.toLowerCase().includes(lowerKeyword)) matchReason = 'Name';
+                    else if ((req.description || '').toLowerCase().includes(lowerKeyword)) matchReason = 'Description';
+                    else if (req.url.toLowerCase().includes(lowerKeyword)) matchReason = 'URL';
+                    else if (req.method.toLowerCase().includes(lowerKeyword)) matchReason = 'Method';
 
                     if (matchReason) {
                         searchResults.push({
@@ -72,21 +69,18 @@ export const searchResources: Resource[] = [
             }
 
             return {
-                contents: [
-                    {
-                        type: 'text',
-                        text: JSON.stringify(searchResults, null, 2),
-                    },
-                ],
+                content: [{ type: 'text', text: JSON.stringify(searchResults, null, 2) }],
             };
         },
     },
 
     {
-        uri: 'insomnia://stats',
-        name: 'Statistics',
-        description: 'Global statistics of all collections',
-        mimeType: 'application/json',
+        name: 'get_stats',
+        description: 'Get global statistics of all collections',
+        inputSchema: {
+            type: 'object',
+            properties: {},
+        },
         handler: async () => {
             const collections = storage.getAllCollections();
             const totalCollections = collections.size;
@@ -107,18 +101,18 @@ export const searchResources: Resource[] = [
                     totalEnvironmentVariables += Object.keys(env.data).length;
                 });
 
-                structure.requests.forEach((request: InsomniaRequest) => {
-                    methodStats[request.method] = (methodStats[request.method] || 0) + 1;
-                    const authType = request.authentication?.type ?? 'none';
+                structure.requests.forEach((req: InsomniaRequest) => {
+                    methodStats[req.method] = (methodStats[req.method] || 0) + 1;
+                    const authType = req.authentication?.type ?? 'none';
                     authStats[authType] = (authStats[authType] || 0) + 1;
 
                     recentActivity.push({
                         type: 'request',
-                        id: request._id,
-                        name: request.name,
+                        id: req._id,
+                        name: req.name,
                         collectionName: structure.workspace.name,
-                        method: request.method,
-                        modified: request.modified,
+                        method: req.method,
+                        modified: req.modified,
                     });
                 });
 
@@ -155,12 +149,7 @@ export const searchResources: Resource[] = [
             };
 
             return {
-                contents: [
-                    {
-                        type: 'text',
-                        text: JSON.stringify(result, null, 2),
-                    },
-                ],
+                content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
             };
         },
     },

@@ -82,6 +82,7 @@ npm run build
 
 - `create_collection` - Create new collection/workspace
 - `list_collections` - List all collections
+- `get_collection_detail` - Get full details and statistics of a collection
 - `export_collection` - Export collection to JSON format
 
 
@@ -91,10 +92,13 @@ npm run build
 
 ### Request Management
 
+- `list_requests` - List all requests, optionally filter by collection
+- `get_request` - Get full details of a specific request
 - `create_request_in_collection` - Create new request
 - `update_request` - Update existing request
 - `delete_request` - Delete request
 - `execute_request` - Execute request and view response
+- `get_request_history` - Get execution history of a request
 - `generate_code_snippet` - Generate a code snippet for a request in various languages/frameworks
 
 ### Import Tools
@@ -106,7 +110,7 @@ npm run build
 
 ### Insomnia Direct Integration (NeDB)
 
-Interact directly with the local Insomnia application database (macOS).
+Interact directly with the local Insomnia application database (macOS, Linux, Windows).
 
 - `list_insomnia_projects` - List all projects/teams from Insomnia
 - `list_insomnia_collections` - List all workspaces/collections from Insomnia
@@ -122,16 +126,10 @@ Interact directly with the local Insomnia application database (macOS).
 - `set_environment_variable` - Set environment variable
 - `get_environment_variables` - Get environment variables
 
-## Available Resources
+### Search & Statistics
 
-- `insomnia://collections` - List all collections
-- `insomnia://requests` - List all requests. Can be filtered by `?collectionId={id}`.
-- `insomnia://environments` - List environment variables. Can be filtered by `?collectionId={id}`.
-- `insomnia://collection/{id}` - Specific collection details
-- `insomnia://request/{id}` - Specific request details
-- `insomnia://request/{id}/history` - Get the execution history for a specific request
-- `insomnia://search?q={keyword}` - Search across all collections, folders, and requests.
-- `insomnia://stats` - Global statistics
+- `search` - Search across all collections, folders, and requests
+- `get_stats` - Get global statistics of all collections
 
 ## Usage Examples
 
@@ -176,9 +174,34 @@ Data is stored in two locations:
    - Changes here do NOT affect the Insomnia App until synced
    - Ideal for generating new collections, importing from OpenAPI, or mass-refactoring
 
-2. **Insomnia App Storage**: `~/Library/Application Support/Insomnia` (NeDB)
+2. **Insomnia App Storage** (NeDB)
    - The database used by Insomnia App
    - Changes here are visible in the App (may require restart)
+   - Default paths:
+     - **macOS**: `~/Library/Application Support/Insomnia`
+     - **Linux**: `~/.config/Insomnia`
+     - **Linux (Flatpak)**: `~/.var/app/rest.insomnia.Insomnia/config/Insomnia`
+     - **Windows**: `%APPDATA%/Insomnia`
+
+### Custom Insomnia Data Directory
+
+If Insomnia is installed in a non-default location, you can set the `INSOMNIA_DATA_DIR` environment variable to specify the path:
+
+```json
+{
+  "mcpServers": {
+    "insomnia": {
+      "command": "npx",
+      "args": ["mcp-insomnia"],
+      "env": {
+        "INSOMNIA_DATA_DIR": "~/.var/app/rest.insomnia.Insomnia/config/Insomnia"
+      }
+    }
+  }
+}
+```
+
+> **Note:** Flatpak installations on Linux are auto-detected — you only need `INSOMNIA_DATA_DIR` if your Insomnia data is in a truly custom location.
 
 ## Recommended Workflow
 
@@ -189,6 +212,22 @@ Data is stored in two locations:
 
 **Scenario B: Running Existing Requests**
 - Use `execute_insomnia_request` to run requests directly from Insomnia App without syncing
+
+## Contributing
+
+Contributions are welcome! Bug fixes, new tools, and improvements are all appreciated.
+
+```bash
+git clone https://github.com/anggasct/mcp-insomnia.git
+cd mcp-insomnia
+npm install
+npm run build
+npx @modelcontextprotocol/inspector node dist/index.js  # test via MCP Inspector
+```
+
+Fork the repo, create a branch from `main`, and open a PR. Use [conventional commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, etc.).
+
+Found a bug or have an idea? [Open an issue](https://github.com/anggasct/mcp-insomnia/issues).
 
 ## License
 

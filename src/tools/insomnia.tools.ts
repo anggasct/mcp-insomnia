@@ -26,7 +26,7 @@ export const insomniaTools: Tool[] = [
         },
         handler: async () => {
             if (!insomniaStorage.isInsomniaInstalled()) {
-                throw new Error('Insomnia is not installed or not found at the default location');
+                throw new Error(insomniaStorage.getNotInstalledMessage());
             }
 
             const workspaces = insomniaStorage.getAllWorkspaces();
@@ -67,7 +67,7 @@ export const insomniaTools: Tool[] = [
         },
         handler: async () => {
             if (!insomniaStorage.isInsomniaInstalled()) {
-                throw new Error('Insomnia is not installed or not found at the default location');
+                throw new Error(insomniaStorage.getNotInstalledMessage());
             }
 
             const projects = insomniaStorage.getAllProjects();
@@ -112,7 +112,7 @@ export const insomniaTools: Tool[] = [
             const { workspaceId } = request.params.arguments as { workspaceId: string };
 
             if (!insomniaStorage.isInsomniaInstalled()) {
-                throw new Error('Insomnia is not installed');
+                throw new Error(insomniaStorage.getNotInstalledMessage());
             }
 
             const collection = insomniaStorage.getCollection(workspaceId);
@@ -173,7 +173,7 @@ export const insomniaTools: Tool[] = [
             const { workspaceId } = request.params.arguments as { workspaceId: string };
 
             if (!insomniaStorage.isInsomniaInstalled()) {
-                throw new Error('Insomnia is not installed');
+                throw new Error(insomniaStorage.getNotInstalledMessage());
             }
 
             const collection = insomniaStorage.getCollection(workspaceId);
@@ -226,7 +226,7 @@ export const insomniaTools: Tool[] = [
             };
 
             if (!insomniaStorage.isInsomniaInstalled()) {
-                throw new Error('Insomnia is not installed');
+                throw new Error(insomniaStorage.getNotInstalledMessage());
             }
 
             const collection = storage.getCollection(collectionId);
@@ -292,7 +292,7 @@ export const insomniaTools: Tool[] = [
         },
         handler: async () => {
             if (!insomniaStorage.isInsomniaInstalled()) {
-                throw new Error('Insomnia is not installed');
+                throw new Error(insomniaStorage.getNotInstalledMessage());
             }
 
             const collections = insomniaStorage.getAllCollections();
@@ -338,7 +338,7 @@ export const insomniaTools: Tool[] = [
             const { requestId } = request.params.arguments as { requestId: string };
 
             if (!insomniaStorage.isInsomniaInstalled()) {
-                throw new Error('Insomnia is not installed');
+                throw new Error(insomniaStorage.getNotInstalledMessage());
             }
 
             const allRequests = insomniaStorage.getAllRequests();
@@ -403,7 +403,7 @@ export const insomniaTools: Tool[] = [
             };
 
             if (!insomniaStorage.isInsomniaInstalled()) {
-                throw new Error('Insomnia is not installed');
+                throw new Error(insomniaStorage.getNotInstalledMessage());
             }
 
             const allRequests = insomniaStorage.getAllRequests();

@@ -4,6 +4,7 @@ import { requestTools } from './request.tools.js';
 import { environmentTools } from './environment.tools.js';
 import { utilityTools } from './utility.tools.js';
 import { insomniaTools } from './insomnia.tools.js';
+import { searchTools } from './search.tools.js';
 import type { Tool } from '../types/tool.js';
 
 export function createInsomniaTools(): Tool[] {
@@ -14,5 +15,6 @@ export function createInsomniaTools(): Tool[] {
         ...environmentTools,
         ...utilityTools,
         ...insomniaTools,
+        ...searchTools,
     ];
 }

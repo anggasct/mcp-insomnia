@@ -14,6 +14,179 @@ import type {
 
 export const requestTools: Tool[] = [
     {
+        name: 'list_requests',
+        description: 'List all requests across collections. Optionally filter by collectionId.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                collectionId: { type: 'string', description: 'Filter by collection ID (optional)' },
+            },
+        },
+        handler: async (request) => {
+            const { collectionId: collectionIdFilter } = (request.params.arguments || {}) as {
+                collectionId?: string;
+            };
+
+            const collections = collectionIdFilter
+                ? new Map([[collectionIdFilter, storage.getCollection(collectionIdFilter)]])
+                : storage.getAllCollections();
+
+            const allRequests: Array<Record<string, unknown>> = [];
+
+            for (const [collectionId, structure] of collections.entries()) {
+                if (!structure) continue;
+
+                const requests = structure.requests.map((req: InsomniaRequest) => ({
+                    id: req._id,
+                    collectionId,
+                    collectionName: structure.workspace.name,
+                    parentId: req.parentId,
+                    parentName:
+                        structure.folders.find((f) => f._id === req.parentId)?.name ?? 'Root',
+                    name: req.name,
+                    description: req.description,
+                    method: req.method,
+                    url: req.url,
+                    hasAuthentication: !!req.authentication,
+                    headerCount: req.headers.length,
+                    parameterCount: req.parameters.length,
+                    hasBody: !!req.body,
+                    created: new Date(req.created).toISOString(),
+                    modified: new Date(req.modified).toISOString(),
+                }));
+
+                allRequests.push(...requests);
+            }
+
+            allRequests.sort(
+                (a, b) => new Date(b.modified as string).getTime() - new Date(a.modified as string).getTime(),
+            );
+
+            return {
+                content: [{ type: 'text', text: JSON.stringify(allRequests, null, 2) }],
+            };
+        },
+    },
+
+    {
+        name: 'get_request',
+        description: 'Get full details of a specific request by ID',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                requestId: { type: 'string', description: 'ID of the request' },
+            },
+            required: ['requestId'],
+        },
+        handler: async (request) => {
+            const { requestId } = request.params.arguments as { requestId: string };
+            const collections = storage.getAllCollections();
+
+            let targetRequest: InsomniaRequest | null = null;
+            let collectionInfo: Record<string, string> | null = null;
+
+            for (const [collectionId, structure] of collections.entries()) {
+                const foundRequest = structure.requests.find((r: InsomniaRequest) => r._id === requestId);
+                if (foundRequest) {
+                    targetRequest = foundRequest;
+                    collectionInfo = {
+                        id: collectionId,
+                        name: structure.workspace.name,
+                        parentName:
+                            foundRequest.parentId === collectionId
+                                ? 'Root'
+                                : (structure.folders.find((f) => f._id === foundRequest.parentId)?.name ?? 'Unknown'),
+                    };
+                    break;
+                }
+            }
+
+            if (!targetRequest) {
+                throw new Error(`Request with ID ${requestId} not found`);
+            }
+
+            const result = {
+                id: targetRequest._id,
+                name: targetRequest.name,
+                description: targetRequest.description,
+                method: targetRequest.method,
+                url: targetRequest.url,
+                collection: collectionInfo,
+                headers: targetRequest.headers,
+                parameters: targetRequest.parameters,
+                body: targetRequest.body || null,
+                authentication: targetRequest.authentication
+                    ? {
+                          type: targetRequest.authentication.type,
+                          hasCredentials: !!(targetRequest.authentication.username ?? targetRequest.authentication.token),
+                      }
+                    : null,
+                metadata: {
+                    created: new Date(targetRequest.created).toISOString(),
+                    modified: new Date(targetRequest.modified).toISOString(),
+                    hasHeaders: targetRequest.headers.length > 0,
+                    hasParameters: targetRequest.parameters.length > 0,
+                    hasBody: !!targetRequest.body,
+                    hasAuthentication: !!targetRequest.authentication,
+                },
+            };
+
+            return {
+                content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+            };
+        },
+    },
+
+    {
+        name: 'get_request_history',
+        description: 'Get the execution history of a specific request',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                requestId: { type: 'string', description: 'ID of the request' },
+            },
+            required: ['requestId'],
+        },
+        handler: async (request) => {
+            const { requestId } = request.params.arguments as { requestId: string };
+            const collections = storage.getAllCollections();
+
+            let targetRequest: InsomniaRequest | null = null;
+
+            for (const structure of collections.values()) {
+                const foundRequest = structure.requests.find((r: InsomniaRequest) => r._id === requestId);
+                if (foundRequest) {
+                    targetRequest = foundRequest;
+                    break;
+                }
+            }
+
+            if (!targetRequest) {
+                throw new Error(`Request with ID ${requestId} not found`);
+            }
+
+            const history = (targetRequest.history || []).map((h: InsomniaExecution) => ({
+                id: h._id,
+                timestamp: new Date(h.timestamp).toISOString(),
+                response: {
+                    statusCode: h.response.statusCode,
+                    statusMessage: h.response.statusMessage,
+                    duration: h.response.duration,
+                    size: h.response.size,
+                    headers: h.response.headers,
+                    body: h.response.body,
+                },
+                error: h.error,
+            }));
+
+            return {
+                content: [{ type: 'text', text: JSON.stringify(history, null, 2) }],
+            };
+        },
+    },
+
+
+    {
         name: 'create_request_in_collection',
         description: 'Create a new request within a specific collection/folder',
         inputSchema: {
