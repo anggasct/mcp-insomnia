@@ -477,7 +477,7 @@ export const requestTools: Tool[] = [
                             variablesStr = variablesStr.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
                         });
 
-                        let variables = {};
+                        let variables: unknown = {};
                         try {
                             variables = JSON.parse(variablesStr);
                         } catch { }

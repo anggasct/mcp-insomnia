@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { createInsomniaTools } from './tools/index.js';
 
-const server = new Server(
+const mcpServer = new McpServer(
     {
         name: 'mcp-insomnia',
         version: '0.5.0',
@@ -17,6 +17,7 @@ const server = new Server(
     },
 );
 
+const server = mcpServer.server;
 const tools = createInsomniaTools();
 
 server.setRequestHandler(ListToolsRequestSchema, () => {
@@ -40,7 +41,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
 async function main() {
     const transport = new StdioServerTransport();
-    await server.connect(transport);
+    await mcpServer.connect(transport);
 }
 
 main().catch((error: unknown) => {
