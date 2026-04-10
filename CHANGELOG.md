@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/anggasct/mcp-insomnia/compare/v0.5.0...v0.5.1) (2026-04-10)
+
+
+### Bug Fixes
+
+* **deps:** update vulnerable dependencies ([#5](https://github.com/anggasct/mcp-insomnia/issues/5)) ([1d19852](https://github.com/anggasct/mcp-insomnia/commit/1d198521e4b24da03735127e37595b8bc2e4cfbf))
+
 ## [0.5.0] - 2026-03-17
 
 ### Added
