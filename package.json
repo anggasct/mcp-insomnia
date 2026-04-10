@@ -33,8 +33,8 @@
     "dist"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.27.1",
-    "axios": "^1.6.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "axios": "^1.15.0",
     "httpsnippet": "^3.0.9",
     "uuid": "10.0.0"
   },
@@ -53,8 +53,18 @@
     "mcp-insomnia": "dist/index.js"
   },
   "overrides": {
+    "@hono/node-server": "^1.19.13",
+    "hono": "^4.12.12",
     "httpsnippet": {
       "form-data": "^4.0.5"
-    }
+    },
+    "minimatch@3.1.5": {
+      "brace-expansion": "^1.1.13"
+    },
+    "minimatch@^10.2.2": {
+      "brace-expansion": "^5.0.5"
+    },
+    "path-to-regexp": "^8.4.0",
+    "picomatch": "^4.0.4"
   }
 }

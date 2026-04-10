@@ -440,7 +440,7 @@ export const insomniaTools: Tool[] = [
                 created: rawReq.created,
             };
 
-            let environmentVariables: Record<string, string | number | boolean> = {};
+            const environmentVariables: Record<string, string | number | boolean> = {};
             const warnings: Array<{ type: string; folderId?: string; message: string }> = [];
 
             // Step 1: Get ancestor chain and workspace context
@@ -487,7 +487,7 @@ export const insomniaTools: Tool[] = [
                     });
                     continue;
                 }
-                if (folder.environment && Object.keys(folder.environment).length > 0) {
+                if (Object.keys(folder.environment).length > 0) {
                     Object.assign(environmentVariables, folder.environment);
                 }
             }
@@ -522,7 +522,7 @@ export const insomniaTools: Tool[] = [
                         variablesStr = variablesStr.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
                     });
 
-                    let variables = {};
+                    let variables: unknown = {};
                     try {
                         variables = JSON.parse(variablesStr);
                     } catch { }
