@@ -34,7 +34,7 @@
   ],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "axios": "^1.15.0",
+    "axios": "^1.16.0",
     "httpsnippet": "^3.0.9",
     "uuid": "10.0.0"
   },
@@ -54,7 +54,7 @@
   },
   "overrides": {
     "@hono/node-server": "^1.19.13",
-    "hono": "^4.12.12",
+    "hono": "^4.12.18",
     "httpsnippet": {
       "form-data": "^4.0.5"
     },
@@ -65,6 +65,8 @@
       "brace-expansion": "^5.0.5"
     },
     "path-to-regexp": "^8.4.0",
-    "picomatch": "^4.0.4"
+    "picomatch": "^4.0.4",
+    "fast-uri": "^3.1.2",
+    "ip-address": "^10.2.0"
   }
 }
