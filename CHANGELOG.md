@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/anggasct/mcp-insomnia/compare/v0.5.1...v0.5.2) (2026-05-08)
+
+
+### Bug Fixes
+
+* **deps:** resolve all dependabot vulnerabilities ([#8](https://github.com/anggasct/mcp-insomnia/issues/8)) ([d07b7bc](https://github.com/anggasct/mcp-insomnia/commit/d07b7bcab358d61ea262ce307811f558a63bf891))
+
 ## [0.5.1](https://github.com/anggasct/mcp-insomnia/compare/v0.5.0...v0.5.1) (2026-04-10)
 
 
