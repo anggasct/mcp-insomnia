@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.3](https://github.com/anggasct/mcp-insomnia/compare/v0.5.2...v0.5.3) (2026-06-05)
+
+
+### Bug Fixes
+
+* **deps:** resolve all npm vulnerabilities ([#10](https://github.com/anggasct/mcp-insomnia/issues/10)) ([4aa5f50](https://github.com/anggasct/mcp-insomnia/commit/4aa5f501c73a5e55c0dae7430e2738850ee972ee))
+
 ## [0.5.2](https://github.com/anggasct/mcp-insomnia/compare/v0.5.1...v0.5.2) (2026-05-08)
 
 
