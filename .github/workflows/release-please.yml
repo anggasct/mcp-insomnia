@@ -28,8 +28,6 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-      - run: npm install -g npm@latest
-        if: ${{ steps.release.outputs.release_created }}
       - run: npm ci
         if: ${{ steps.release.outputs.release_created }}
       - run: npm audit
