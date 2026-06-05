@@ -36,11 +36,10 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "axios": "^1.16.0",
     "httpsnippet": "^3.0.9",
-    "uuid": "10.0.0"
+    "uuid": "^11.1.1"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "@types/uuid": "10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.52.0",
     "@typescript-eslint/parser": "^8.52.0",
     "eslint": "^9.39.2",
@@ -54,7 +53,7 @@
   },
   "overrides": {
     "@hono/node-server": "^1.19.13",
-    "hono": "^4.12.18",
+    "hono": "^4.12.21",
     "httpsnippet": {
       "form-data": "^4.0.5"
     },
@@ -62,11 +61,12 @@
       "brace-expansion": "^1.1.13"
     },
     "minimatch@^10.2.2": {
-      "brace-expansion": "^5.0.5"
+      "brace-expansion": "^5.0.6"
     },
     "path-to-regexp": "^8.4.0",
     "picomatch": "^4.0.4",
-    "fast-uri": "^3.1.2",
-    "ip-address": "^10.2.0"
+    "qs": "^6.15.2",
+    "ip-address": "^10.2.0",
+    "fast-uri": "^3.1.2"
   }
 }
