@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.4](https://github.com/anggasct/mcp-insomnia/compare/v0.5.3...v0.5.4) (2026-06-05)
+
+
+### Bug Fixes
+
+* **ci:** remove npm@latest upgrade, pin to setup-node built-in npm 10.x ([#12](https://github.com/anggasct/mcp-insomnia/issues/12)) ([c546926](https://github.com/anggasct/mcp-insomnia/commit/c54692620d3024c79fd24b8144926bf69f1567fc))
+
 ## [0.5.3](https://github.com/anggasct/mcp-insomnia/compare/v0.5.2...v0.5.3) (2026-06-05)
 
 
