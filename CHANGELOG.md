@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/anggasct/mcp-insomnia/compare/v0.5.6...v0.6.0) (2026-06-07)
+
+
+### Features
+
+* harden execution tools with response cap, abort, and check gate ([#18](https://github.com/anggasct/mcp-insomnia/issues/18)) ([970c69a](https://github.com/anggasct/mcp-insomnia/commit/970c69aad38a59d3cbcc8bec13ebf517ceabfe91))
+
 ## [0.5.6](https://github.com/anggasct/mcp-insomnia/compare/v0.5.5...v0.5.6) (2026-06-07)
 
 
