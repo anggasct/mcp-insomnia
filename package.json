@@ -51,7 +51,7 @@
     "tsx": "^4.0.0",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.52.0",
-    "vitest": "^3.2.4",
+    "vitest": "^4.1.8",
     "husky": "^9.1.7"
   },
   "bin": {
