@@ -22,3 +22,6 @@ yarn-error.log*
 # OS-generated files
 .DS_Store
 Thumbs.db
+
+# Local verification scripts (not shipped)
+/scripts/

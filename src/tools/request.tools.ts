@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import axios, { AxiosError } from 'axios';
 import { storage } from '../storage/index.js';
-import { normalizeHeaders, HeadersInput } from '../utils/http.js';
+import { normalizeHeaders, HeadersInput, serializedByteLength } from '../utils/http.js';
 import type { Tool } from '../types/tool.js';
 import type {
     CreateRequestParams,
@@ -530,7 +530,7 @@ export const requestTools: Tool[] = [
                     headers: normalizeHeaders(response.headers as HeadersInput),
                     data: response.data as ResponseData,
                     duration,
-                    size: JSON.stringify(response.data).length,
+                    size: serializedByteLength(response.data),
                     timestamp: new Date().toISOString(),
                 };
 
@@ -560,13 +560,14 @@ export const requestTools: Tool[] = [
             } catch (err) {
                 const duration = Date.now() - startTime;
                 const error = err as AxiosError<ResponseData>;
+                const responseData = error.response?.data;
                 const errorResult = {
                     error: true,
                     message: error.message || 'Unknown error',
                     status: error.response?.status,
                     statusText: error.response?.statusText,
                     headers: normalizeHeaders(error.response?.headers as HeadersInput),
-                    data: error.response?.data,
+                    data: responseData,
                     duration,
                     timestamp: new Date().toISOString(),
                 };
@@ -579,9 +580,9 @@ export const requestTools: Tool[] = [
                         statusCode: error.response?.status ?? 0,
                         statusMessage: error.response?.statusText || error.message || 'Unknown error',
                         headers: normalizeHeaders(error.response?.headers as HeadersInput),
-                        body: JSON.stringify(error.response?.data),
+                        body: responseData === undefined ? '' : JSON.stringify(responseData),
                         duration,
-                        size: JSON.stringify(error.response?.data).length,
+                        size: serializedByteLength(responseData),
                     },
                     error: {
                         message: error.message || 'Unknown error',
