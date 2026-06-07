@@ -1,26 +1,65 @@
 name: Publish to NPM
 
 on:
+  workflow_run:
+    workflows: ['Release Please']
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to publish (tag e.g. v0.5.4, or branch)'
+        required: false
+        default: main
   release:
     types: [published]
 
 permissions:
-  id-token: write 
+  id-token: write
   contents: read
 
 jobs:
   publish:
+    if: >
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'release'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.event.release.tag_name || inputs.ref || github.ref }}
+          fetch-depth: 0
+
       - uses: actions/setup-node@v6
         with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: '24'
+
+      - run: npm install -g npm@11.6.2
+
+      - name: Check if publish needed
+        id: check
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if npm view "mcp-insomnia@${VERSION}" version >/dev/null 2>&1; then
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+            echo "Version ${VERSION} already on npm, skipping."
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            echo "Version ${VERSION} not on npm, will publish."
+          fi
+
       - run: npm ci
+        if: steps.check.outputs.needed == 'true'
       - run: npm audit
+        if: steps.check.outputs.needed == 'true'
       - run: npm run lint
+        if: steps.check.outputs.needed == 'true'
       - run: npm run lint:eslint
+        if: steps.check.outputs.needed == 'true'
       - run: npm run build
-      - run: npm publish --provenance
+        if: steps.check.outputs.needed == 'true'
+      # OIDC trusted publishing — no registry-url / NODE_AUTH_TOKEN (see project-docs/trackers/npm-publish-regressions.md)
+      - run: npm publish --provenance --access public
+        if: steps.check.outputs.needed == 'true'
