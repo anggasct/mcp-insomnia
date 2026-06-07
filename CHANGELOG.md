@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.6](https://github.com/anggasct/mcp-insomnia/compare/v0.5.5...v0.5.6) (2026-06-07)
+
+
+### Bug Fixes
+
+* read server version from package.json and harden request parsing ([#16](https://github.com/anggasct/mcp-insomnia/issues/16)) ([65a50c8](https://github.com/anggasct/mcp-insomnia/commit/65a50c871659fe6ed1616eda89444c764a63b081))
+
 ## [0.5.5](https://github.com/anggasct/mcp-insomnia/compare/v0.5.4...v0.5.5) (2026-06-07)
 
 
