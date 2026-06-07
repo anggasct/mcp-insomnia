@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.5](https://github.com/anggasct/mcp-insomnia/compare/v0.5.4...v0.5.5) (2026-06-07)
+
+
+### Bug Fixes
+
+* **ci:** restore npm publish via workflow_run and OIDC ([#14](https://github.com/anggasct/mcp-insomnia/issues/14)) ([4148b16](https://github.com/anggasct/mcp-insomnia/commit/4148b161d7fd63db340256eee864ffb04440b0d3))
+
 ## [0.5.4](https://github.com/anggasct/mcp-insomnia/compare/v0.5.3...v0.5.4) (2026-06-05)
 
 
