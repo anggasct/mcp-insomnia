@@ -1,5 +1,79 @@
 import type { HttpMethod, InsomniaHeader, InsomniaParameter, InsomniaRequestBody } from '../types/request.js';
 
+const DATA_FLAGS = ['--data-binary', '--data-raw', '--data', '-d'] as const;
+
+/** Read a quoted or unquoted token starting at `start`. Supports \\ and \' / \" escapes inside quotes. */
+function readQuotedOrUnquotedValue(command: string, start: number): string {
+    if (start >= command.length) {
+        return '';
+    }
+
+    const quote = command[start];
+    if (quote === "'" || quote === '"') {
+        let i = start + 1;
+        let result = '';
+        while (i < command.length) {
+            if (command[i] === '\\' && i + 1 < command.length) {
+                result += command[i + 1];
+                i += 2;
+                continue;
+            }
+            if (command[i] === quote) {
+                return result;
+            }
+            result += command[i];
+            i++;
+        }
+        return result;
+    }
+
+    let i = start;
+    let result = '';
+    while (i < command.length && !/\s/.test(command[i])) {
+        result += command[i];
+        i++;
+    }
+    return result;
+}
+
+/** Extract -d / --data* body value with quote-aware parsing. Header -H values still use the legacy regex. */
+function extractDataFlagValue(command: string): string | undefined {
+    let earliestIndex = Infinity;
+    let valueStart = -1;
+
+    for (const flag of DATA_FLAGS) {
+        const escaped = flag.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const boundary = flag === '--data' ? '(?=\\s|=|$)' : '';
+        const regex = new RegExp(`(?:^|\\s)${escaped}${boundary}(?:\\s|=)`, 'g');
+        let match: RegExpExecArray | null;
+        while ((match = regex.exec(command)) !== null) {
+            const flagIndex = match.index + (command[match.index] === ' ' ? 1 : 0);
+            let pos = flagIndex + flag.length;
+            while (pos < command.length && /\s/.test(command[pos])) {
+                pos++;
+            }
+            if (command[pos] === '=') {
+                pos++;
+                while (pos < command.length && /\s/.test(command[pos])) {
+                    pos++;
+                }
+            }
+            if (command[pos] === '@') {
+                continue;
+            }
+            if (flagIndex < earliestIndex) {
+                earliestIndex = flagIndex;
+                valueStart = pos;
+            }
+        }
+    }
+
+    if (valueStart === -1) {
+        return undefined;
+    }
+    return readQuotedOrUnquotedValue(command, valueStart);
+}
+
 export interface ParsedCurlRequest {
     method: HttpMethod;
     url: string;
@@ -49,12 +123,10 @@ export function parseCurlCommand(curlCommand: string): ParsedCurlRequest {
     }
 
     // Extract data (-d or --data or --data-raw or --data-binary)
-    const dataMatch = normalized.match(/(?:-d|--data(?:-raw|-binary)?)\s+['"]([^'"]*)['"]/);
-    if (dataMatch) {
-        const bodyText = dataMatch[1];
+    const bodyText = extractDataFlagValue(normalized);
+    if (bodyText !== undefined) {
         method = method === 'GET' ? 'POST' : method; // Default to POST if data is present
 
-        // Determine content type from headers
         const contentTypeHeader = headers.find((h) => h.name.toLowerCase() === 'content-type');
         const mimeType = contentTypeHeader?.value || 'application/x-www-form-urlencoded';
 

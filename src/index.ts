@@ -1,14 +1,21 @@
 #!/usr/bin/env node
 
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { createInsomniaTools } from './tools/index.js';
 
+// Relative to dist/index.js — package.json lives one level up
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8')) as { version: string };
+
 const mcpServer = new McpServer(
     {
         name: 'mcp-insomnia',
-        version: '0.5.0',
+        version: pkg.version,
     },
     {
         capabilities: {
