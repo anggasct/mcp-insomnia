@@ -31,9 +31,13 @@ export interface ToolResponse {
     isError?: boolean;
 }
 
+export interface ToolExecutionContext {
+    signal: AbortSignal;
+}
+
 export interface Tool {
     name: string;
     description: string;
     inputSchema: JsonSchema;
-    handler: (request: CallToolRequest) => Promise<ToolResponse>;
+    handler: (request: CallToolRequest, context: ToolExecutionContext) => Promise<ToolResponse>;
 }

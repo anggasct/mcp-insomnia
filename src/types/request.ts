@@ -85,6 +85,8 @@ export interface RequestExecutionResult {
     duration: number;
     size: number;
     timestamp: string;
+    truncated?: true;
+    maxResponseBytes?: number;
 }
 
 export interface CreateRequestParams {

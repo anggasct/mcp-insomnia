@@ -37,13 +37,13 @@ server.setRequestHandler(ListToolsRequestSchema, () => {
     };
 });
 
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
+server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     const { name } = request.params;
     const tool = tools.find((t) => t.name === name);
     if (!tool) {
         throw new Error(`Tool ${name} not found`);
     }
-    return await tool.handler(request);
+    return await tool.handler(request, { signal: extra.signal });
 });
 
 async function main() {

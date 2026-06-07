@@ -1,7 +1,16 @@
 import { v4 as uuidv4 } from 'uuid';
 import axios, { AxiosError } from 'axios';
 import { storage } from '../storage/index.js';
-import { normalizeHeaders, HeadersInput, serializedByteLength } from '../utils/http.js';
+import {
+    normalizeHeaders,
+    HeadersInput,
+    serializedByteLength,
+    capResponsePayload,
+    createExecutionAbortSignal,
+    getAbortErrorInfo,
+    resolveExecutionTimeoutMs,
+} from '../utils/http.js';
+import type { ToolExecutionContext } from '../types/tool.js';
 import type { Tool } from '../types/tool.js';
 import type {
     CreateRequestParams,
@@ -408,13 +417,25 @@ export const requestTools: Tool[] = [
             properties: {
                 requestId: { type: 'string', description: 'ID of the request to execute' },
                 environmentVariables: { type: 'object', description: 'Environment variables for the request' },
+                maxResponseBytes: {
+                    type: 'number',
+                    description:
+                        'Optional max serialized response body bytes in tool output. Omit or set <= 0 for no cap. When exceeded, data becomes a truncated string preview.',
+                },
+                timeoutMs: {
+                    type: 'number',
+                    description:
+                        'Optional request timeout in milliseconds. Default 30000. Set <= 0 for no timeout (MCP cancellation still applies).',
+                },
             },
             required: ['requestId'],
         },
-        handler: async (request) => {
-            const { requestId, environmentVariables = {} } = request.params.arguments as {
+        handler: async (request, context: ToolExecutionContext) => {
+            const { requestId, environmentVariables = {}, maxResponseBytes, timeoutMs } = request.params.arguments as {
                 requestId: string;
                 environmentVariables?: Record<string, string | number | boolean>;
+                maxResponseBytes?: number;
+                timeoutMs?: number;
             };
 
             let targetRequest: InsomniaRequest | null = null;
@@ -434,6 +455,11 @@ export const requestTools: Tool[] = [
             }
 
             const startTime = Date.now();
+            const resolvedTimeoutMs = resolveExecutionTimeoutMs(timeoutMs);
+            const executionSignal = createExecutionAbortSignal({
+                mcpSignal: context.signal,
+                timeoutMs,
+            });
 
             try {
                 let processedUrl = targetRequest.url;
@@ -520,18 +546,22 @@ export const requestTools: Tool[] = [
                     url: processedUrl,
                     headers: processedHeaders,
                     data: processedBody,
-                    timeout: 30000,
+                    signal: executionSignal,
                 });
 
                 const duration = Date.now() - startTime;
+                const capped = capResponsePayload(response.data, maxResponseBytes);
                 const result: RequestExecutionResult = {
                     status: response.status,
                     statusText: response.statusText,
                     headers: normalizeHeaders(response.headers as HeadersInput),
-                    data: response.data as ResponseData,
+                    data: capped.data as ResponseData,
                     duration,
-                    size: serializedByteLength(response.data),
+                    size: capped.size,
                     timestamp: new Date().toISOString(),
+                    ...(capped.truncated
+                        ? { truncated: true as const, maxResponseBytes: capped.maxResponseBytes }
+                        : {}),
                 };
 
                 const execution: InsomniaExecution = {
@@ -559,17 +589,66 @@ export const requestTools: Tool[] = [
                 };
             } catch (err) {
                 const duration = Date.now() - startTime;
+                const abortInfo = getAbortErrorInfo(err, {
+                    mcpSignal: context.signal,
+                    executionSignal,
+                    timeoutMs: resolvedTimeoutMs,
+                });
+
+                if (abortInfo) {
+                    const cancelledResult = {
+                        error: true,
+                        cancelled: true,
+                        cancelReason: abortInfo.cancelReason,
+                        message: abortInfo.message,
+                        duration,
+                        timestamp: new Date().toISOString(),
+                    };
+
+                    const execution: InsomniaExecution = {
+                        _id: `ex_${uuidv4().replace(/-/g, '')}`,
+                        parentId: requestId,
+                        timestamp: Date.now(),
+                        response: {
+                            statusCode: 0,
+                            statusMessage: abortInfo.message,
+                            headers: {},
+                            body: '',
+                            duration,
+                            size: 0,
+                        },
+                        error: {
+                            message: abortInfo.message,
+                        },
+                    };
+                    storage.addExecution(collectionId, requestId, execution);
+
+                    return {
+                        content: [
+                            {
+                                type: 'text',
+                                text: JSON.stringify(cancelledResult, null, 2),
+                            },
+                        ],
+                    };
+                }
+
                 const error = err as AxiosError<ResponseData>;
                 const responseData = error.response?.data;
+                const cappedError = capResponsePayload(responseData, maxResponseBytes);
                 const errorResult = {
                     error: true,
                     message: error.message || 'Unknown error',
                     status: error.response?.status,
                     statusText: error.response?.statusText,
                     headers: normalizeHeaders(error.response?.headers as HeadersInput),
-                    data: responseData,
+                    data: cappedError.data,
                     duration,
                     timestamp: new Date().toISOString(),
+                    size: cappedError.size,
+                    ...(cappedError.truncated
+                        ? { truncated: true as const, maxResponseBytes: cappedError.maxResponseBytes }
+                        : {}),
                 };
 
                 const execution: InsomniaExecution = {
