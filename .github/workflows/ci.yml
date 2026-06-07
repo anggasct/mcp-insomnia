@@ -16,6 +16,4 @@ jobs:
           node-version: '20'
       - run: npm ci
       - run: npm audit
-      - run: npm run lint
-      - run: npm run lint:eslint
-      - run: npm run build
+      - run: npm run check

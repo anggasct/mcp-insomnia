@@ -1,7 +1,12 @@
 import axios from 'axios';
 import { insomniaStorage } from '../storage/insomnia-storage.js';
 import { storage } from '../storage/storage.js';
-import type { Tool } from '../types/tool.js';
+import {
+    createExecutionAbortSignal,
+    getAbortErrorInfo,
+    resolveExecutionTimeoutMs,
+} from '../utils/http.js';
+import type { Tool, ToolExecutionContext } from '../types/tool.js';
 import type { InsomniaRequest } from '../types/request.js';
 
 function normalizeHeaders(headers: Record<string, unknown>): Record<string, string> {
@@ -392,14 +397,20 @@ export const insomniaTools: Tool[] = [
                     type: 'object',
                     description: 'Optional variables to override environment values (e.g., {"token": "abc123"})',
                 },
+                timeoutMs: {
+                    type: 'number',
+                    description:
+                        'Optional request timeout in milliseconds. Default 30000. Set <= 0 for no timeout (MCP cancellation still applies).',
+                },
             },
             required: ['requestId'],
         },
-        handler: async (request) => {
-            const { requestId, environmentId, overrideVariables } = request.params.arguments as {
+        handler: async (request, context: ToolExecutionContext) => {
+            const { requestId, environmentId, overrideVariables, timeoutMs } = request.params.arguments as {
                 requestId: string;
                 environmentId?: string;
                 overrideVariables?: Record<string, string>;
+                timeoutMs?: number;
             };
 
             if (!insomniaStorage.isInsomniaInstalled()) {
@@ -553,6 +564,12 @@ export const insomniaTools: Tool[] = [
             }
 
             const startTime = Date.now();
+            const resolvedTimeoutMs = resolveExecutionTimeoutMs(timeoutMs);
+            const executionSignal = createExecutionAbortSignal({
+                mcpSignal: context.signal,
+                timeoutMs,
+            });
+
             try {
                 const response = await axios({
                     method: targetRequest.method.toLowerCase() as
@@ -566,7 +583,7 @@ export const insomniaTools: Tool[] = [
                     url: processedUrl,
                     headers: processedHeaders,
                     data: processedBody,
-                    timeout: 30000,
+                    signal: executionSignal,
                     validateStatus: () => true,
                 });
 
@@ -601,8 +618,42 @@ export const insomniaTools: Tool[] = [
                     ],
                 };
             } catch (error) {
-                const err = error as Error & { code?: string };
                 const duration = Date.now() - startTime;
+                const abortInfo = getAbortErrorInfo(error, {
+                    mcpSignal: context.signal,
+                    executionSignal,
+                    timeoutMs: resolvedTimeoutMs,
+                });
+
+                if (abortInfo) {
+                    return {
+                        content: [
+                            {
+                                type: 'text',
+                                text: JSON.stringify(
+                                    {
+                                        success: false,
+                                        cancelled: true,
+                                        cancelReason: abortInfo.cancelReason,
+                                        request: {
+                                            name: targetRequest.name,
+                                            method: targetRequest.method,
+                                            url: processedUrl,
+                                        },
+                                        error: {
+                                            message: abortInfo.message,
+                                            duration: `${String(duration)}ms`,
+                                        },
+                                    },
+                                    null,
+                                    2,
+                                ),
+                            },
+                        ],
+                    };
+                }
+
+                const err = error as Error & { code?: string };
 
                 return {
                     content: [

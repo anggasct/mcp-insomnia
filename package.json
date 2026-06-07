@@ -9,12 +9,16 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "watch": "tsx watch src/index.ts",
-    "lint": "tsc --noEmit",
+    "lint": "tsc --noEmit -p tsconfig.check.json",
+    "check": "npm run lint && npm run lint:eslint && npm run build && npm test",
     "lint:strict": "tsc --noEmit --strict",
     "lint:eslint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "format": "prettier --write \"src/**/*.{ts,js,json,md}\"",
-    "typecheck": "tsc --noEmit --pretty"
+    "typecheck": "tsc --noEmit --pretty",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepare": "husky"
   },
   "keywords": [
     "mcp",
@@ -46,7 +50,9 @@
     "prettier": "^3.7.4",
     "tsx": "^4.0.0",
     "typescript": "^5.0.0",
-    "typescript-eslint": "^8.52.0"
+    "typescript-eslint": "^8.52.0",
+    "vitest": "^4.1.8",
+    "husky": "^9.1.7"
   },
   "bin": {
     "mcp-insomnia": "dist/index.js"
