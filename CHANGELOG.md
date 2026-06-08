@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/anggasct/mcp-insomnia/compare/v0.6.0...v0.7.0) (2026-06-08)
+
+
+### Features
+
+* share execute logic and add internal env cascade ([#20](https://github.com/anggasct/mcp-insomnia/issues/20)) ([090eda5](https://github.com/anggasct/mcp-insomnia/commit/090eda5adf185d61c8292f6fe119aa66fff2526b))
+
 ## [0.6.0](https://github.com/anggasct/mcp-insomnia/compare/v0.5.6...v0.6.0) (2026-06-07)
 
 
