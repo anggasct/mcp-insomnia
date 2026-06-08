@@ -150,8 +150,26 @@ export class InsomniaStorage {
 
         const folders = allFolders.filter((f) => workspaceFolderIds.has(f._id)).map((f) => this.convertRequestGroup(f));
 
+        const collectedEnvIds = new Set<string>();
+        for (const env of allEnvironments) {
+            if (env.parentId === workspaceId) {
+                collectedEnvIds.add(env._id);
+            }
+        }
+
+        let foundNewEnv = true;
+        while (foundNewEnv) {
+            foundNewEnv = false;
+            for (const env of allEnvironments) {
+                if (!collectedEnvIds.has(env._id) && collectedEnvIds.has(env.parentId)) {
+                    collectedEnvIds.add(env._id);
+                    foundNewEnv = true;
+                }
+            }
+        }
+
         const environments = allEnvironments
-            .filter((e) => e.parentId === workspaceId)
+            .filter((e) => collectedEnvIds.has(e._id))
             .map((e) => this.convertEnvironment(e));
 
         return {

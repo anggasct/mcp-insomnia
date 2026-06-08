@@ -1,15 +1,9 @@
 import { v4 as uuidv4 } from 'uuid';
-import axios, { AxiosError } from 'axios';
 import { storage } from '../storage/index.js';
-import {
-    normalizeHeaders,
-    HeadersInput,
-    serializedByteLength,
-    capResponsePayload,
-    createExecutionAbortSignal,
-    getAbortErrorInfo,
-    resolveExecutionTimeoutMs,
-} from '../utils/http.js';
+import { serializedByteLength } from '../utils/http.js';
+import { executeHttpRequest } from '../utils/request-executor.js';
+import { resolveInternalEnvironmentVariables } from '../utils/env-resolver.js';
+import type { CollectionStructure } from '../types/collection.js';
 import type { ToolExecutionContext } from '../types/tool.js';
 import type { Tool } from '../types/tool.js';
 import type {
@@ -416,7 +410,19 @@ export const requestTools: Tool[] = [
             type: 'object',
             properties: {
                 requestId: { type: 'string', description: 'ID of the request to execute' },
-                environmentVariables: { type: 'object', description: 'Environment variables for the request' },
+                environmentId: {
+                    type: 'string',
+                    description: 'Sub-environment ID from the collection for variable substitution',
+                },
+                overrideVariables: {
+                    type: 'object',
+                    description: 'Per-call variable overrides merged after stored env layers',
+                },
+                environmentVariables: {
+                    type: 'object',
+                    description:
+                        'Final override layer for environment variables (backward compatible with UC-31)',
+                },
                 maxResponseBytes: {
                     type: 'number',
                     description:
@@ -431,8 +437,17 @@ export const requestTools: Tool[] = [
             required: ['requestId'],
         },
         handler: async (request, context: ToolExecutionContext) => {
-            const { requestId, environmentVariables = {}, maxResponseBytes, timeoutMs } = request.params.arguments as {
+            const {
+                requestId,
+                environmentId,
+                overrideVariables,
+                environmentVariables = {},
+                maxResponseBytes,
+                timeoutMs,
+            } = request.params.arguments as {
                 requestId: string;
+                environmentId?: string;
+                overrideVariables?: Record<string, string | number | boolean>;
                 environmentVariables?: Record<string, string | number | boolean>;
                 maxResponseBytes?: number;
                 timeoutMs?: number;
@@ -440,127 +455,49 @@ export const requestTools: Tool[] = [
 
             let targetRequest: InsomniaRequest | null = null;
             let collectionId: string | null = null;
+            let targetCollection: CollectionStructure | null = null;
             const collections = storage.getAllCollections();
             for (const [cId, collection] of collections.entries()) {
                 const foundRequest = collection.requests.find((r: InsomniaRequest) => r._id === requestId);
                 if (foundRequest) {
                     targetRequest = foundRequest;
                     collectionId = cId;
+                    targetCollection = collection;
                     break;
                 }
             }
 
-            if (!targetRequest || !collectionId) {
+            if (!targetRequest || !collectionId || !targetCollection) {
                 throw new Error(`Request with ID ${requestId} not found`);
             }
 
-            const startTime = Date.now();
-            const resolvedTimeoutMs = resolveExecutionTimeoutMs(timeoutMs);
-            const executionSignal = createExecutionAbortSignal({
-                mcpSignal: context.signal,
-                timeoutMs,
+            const { variables: resolvedEnvironmentVariables } = resolveInternalEnvironmentVariables({
+                collection: targetCollection,
+                requestParentId: targetRequest.parentId || collectionId,
+                environmentId,
+                overrideVariables,
+                legacyEnvironmentVariables: environmentVariables,
             });
 
-            try {
-                let processedUrl = targetRequest.url;
-                Object.entries(environmentVariables).forEach(([key, value]) => {
-                    processedUrl = processedUrl.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-                });
+            const httpResult = await executeHttpRequest({
+                request: targetRequest,
+                environmentVariables: resolvedEnvironmentVariables,
+                mcpSignal: context.signal,
+                timeoutMs,
+                maxResponseBytes,
+            });
 
-                const processedHeaders: Record<string, string> = {};
-                targetRequest.headers.forEach((header) => {
-                    if (!header.disabled) {
-                        let processedValue = header.value;
-                        Object.entries(environmentVariables).forEach(([key, value]) => {
-                            processedValue = processedValue.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-                        });
-                        processedHeaders[header.name] = processedValue;
-                    }
-                });
-
-                if (targetRequest.authentication) {
-                    const auth = targetRequest.authentication;
-                    switch (auth.type) {
-                        case 'bearer':
-                            processedHeaders['Authorization'] = `Bearer ${auth.token ?? ''}`;
-                            break;
-                        case 'basic': {
-                            const credentials = Buffer.from(`${auth.username ?? ''}:${auth.password ?? ''}`).toString(
-                                'base64',
-                            );
-                            processedHeaders['Authorization'] = `Basic ${credentials}`;
-                            break;
-                        }
-                    }
-                }
-
-                let processedBody: string | Record<string, unknown> | undefined = undefined;
-                if (targetRequest.body) {
-                    if (targetRequest.body.graphql) {
-                        const gql = targetRequest.body.graphql;
-                        let variablesStr = gql.variables || '{}';
-                        Object.entries(environmentVariables).forEach(([key, value]) => {
-                            variablesStr = variablesStr.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-                        });
-
-                        let variables: unknown = {};
-                        try {
-                            variables = JSON.parse(variablesStr);
-                        } catch { }
-
-                        let query = gql.query;
-                        Object.entries(environmentVariables).forEach(([key, value]) => {
-                            query = query.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-                        });
-
-                        processedBody = {
-                            query: query,
-                            variables: variables,
-                        };
-
-                    } else if (targetRequest.body.text) {
-                        processedBody = targetRequest.body.text;
-                        Object.entries(environmentVariables).forEach(([key, value]) => {
-                            if (typeof processedBody === 'string') {
-                                processedBody = processedBody.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-                            }
-                        });
-
-                        if (targetRequest.body.mimeType === 'application/json') {
-                            try {
-                                processedBody = JSON.parse(processedBody) as Record<string, unknown>;
-                            } catch { }
-                        }
-                    }
-                }
-
-                const response = await axios({
-                    method: targetRequest.method.toLowerCase() as
-                        | 'get'
-                        | 'post'
-                        | 'put'
-                        | 'delete'
-                        | 'patch'
-                        | 'head'
-                        | 'options',
-                    url: processedUrl,
-                    headers: processedHeaders,
-                    data: processedBody,
-                    signal: executionSignal,
-                });
-
-                const duration = Date.now() - startTime;
-                const capped = capResponsePayload(response.data, maxResponseBytes);
+            if (httpResult.kind === 'success') {
                 const result: RequestExecutionResult = {
-                    status: response.status,
-                    statusText: response.statusText,
-                    headers: normalizeHeaders(response.headers as HeadersInput),
-                    data: capped.data as ResponseData,
-                    duration,
-                    size: capped.size,
+                    status: httpResult.status,
+                    statusText: httpResult.statusText,
+                    headers: httpResult.headers,
+                    data: httpResult.capped.data as ResponseData,
+                    duration: httpResult.duration,
+                    size: httpResult.capped.size,
                     timestamp: new Date().toISOString(),
-                    ...(capped.truncated
-                        ? { truncated: true as const, maxResponseBytes: capped.maxResponseBytes }
+                    ...(httpResult.capped.truncated
+                        ? { truncated: true as const, maxResponseBytes: httpResult.capped.maxResponseBytes }
                         : {}),
                 };
 
@@ -569,86 +506,29 @@ export const requestTools: Tool[] = [
                     parentId: requestId,
                     timestamp: Date.now(),
                     response: {
-                        statusCode: response.status,
-                        statusMessage: response.statusText,
-                        headers: normalizeHeaders(response.headers as HeadersInput),
-                        body: JSON.stringify(response.data),
-                        duration,
+                        statusCode: httpResult.status,
+                        statusMessage: httpResult.statusText,
+                        headers: httpResult.headers,
+                        body: JSON.stringify(httpResult.rawData),
+                        duration: httpResult.duration,
                         size: result.size,
                     },
                 };
                 storage.addExecution(collectionId, requestId, execution);
 
                 return {
-                    content: [
-                        {
-                            type: 'text',
-                            text: JSON.stringify(result, null, 2),
-                        },
-                    ],
+                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
                 };
-            } catch (err) {
-                const duration = Date.now() - startTime;
-                const abortInfo = getAbortErrorInfo(err, {
-                    mcpSignal: context.signal,
-                    executionSignal,
-                    timeoutMs: resolvedTimeoutMs,
-                });
+            }
 
-                if (abortInfo) {
-                    const cancelledResult = {
-                        error: true,
-                        cancelled: true,
-                        cancelReason: abortInfo.cancelReason,
-                        message: abortInfo.message,
-                        duration,
-                        timestamp: new Date().toISOString(),
-                    };
-
-                    const execution: InsomniaExecution = {
-                        _id: `ex_${uuidv4().replace(/-/g, '')}`,
-                        parentId: requestId,
-                        timestamp: Date.now(),
-                        response: {
-                            statusCode: 0,
-                            statusMessage: abortInfo.message,
-                            headers: {},
-                            body: '',
-                            duration,
-                            size: 0,
-                        },
-                        error: {
-                            message: abortInfo.message,
-                        },
-                    };
-                    storage.addExecution(collectionId, requestId, execution);
-
-                    return {
-                        content: [
-                            {
-                                type: 'text',
-                                text: JSON.stringify(cancelledResult, null, 2),
-                            },
-                        ],
-                    };
-                }
-
-                const error = err as AxiosError<ResponseData>;
-                const responseData = error.response?.data;
-                const cappedError = capResponsePayload(responseData, maxResponseBytes);
-                const errorResult = {
+            if (httpResult.kind === 'cancelled') {
+                const cancelledResult = {
                     error: true,
-                    message: error.message || 'Unknown error',
-                    status: error.response?.status,
-                    statusText: error.response?.statusText,
-                    headers: normalizeHeaders(error.response?.headers as HeadersInput),
-                    data: cappedError.data,
-                    duration,
+                    cancelled: true,
+                    cancelReason: httpResult.cancelReason,
+                    message: httpResult.message,
+                    duration: httpResult.duration,
                     timestamp: new Date().toISOString(),
-                    size: cappedError.size,
-                    ...(cappedError.truncated
-                        ? { truncated: true as const, maxResponseBytes: cappedError.maxResponseBytes }
-                        : {}),
                 };
 
                 const execution: InsomniaExecution = {
@@ -656,29 +536,59 @@ export const requestTools: Tool[] = [
                     parentId: requestId,
                     timestamp: Date.now(),
                     response: {
-                        statusCode: error.response?.status ?? 0,
-                        statusMessage: error.response?.statusText || error.message || 'Unknown error',
-                        headers: normalizeHeaders(error.response?.headers as HeadersInput),
-                        body: responseData === undefined ? '' : JSON.stringify(responseData),
-                        duration,
-                        size: serializedByteLength(responseData),
+                        statusCode: 0,
+                        statusMessage: httpResult.message,
+                        headers: {},
+                        body: '',
+                        duration: httpResult.duration,
+                        size: 0,
                     },
-                    error: {
-                        message: error.message || 'Unknown error',
-                        stack: error.stack,
-                    },
+                    error: { message: httpResult.message },
                 };
                 storage.addExecution(collectionId, requestId, execution);
 
                 return {
-                    content: [
-                        {
-                            type: 'text',
-                            text: JSON.stringify(errorResult, null, 2),
-                        },
-                    ],
+                    content: [{ type: 'text', text: JSON.stringify(cancelledResult, null, 2) }],
                 };
             }
+
+            const errorResult = {
+                error: true,
+                message: httpResult.message,
+                status: httpResult.status,
+                statusText: httpResult.statusText,
+                headers: httpResult.headers,
+                data: httpResult.capped.data,
+                duration: httpResult.duration,
+                timestamp: new Date().toISOString(),
+                size: httpResult.capped.size,
+                ...(httpResult.capped.truncated
+                    ? { truncated: true as const, maxResponseBytes: httpResult.capped.maxResponseBytes }
+                    : {}),
+            };
+
+            const execution: InsomniaExecution = {
+                _id: `ex_${uuidv4().replace(/-/g, '')}`,
+                parentId: requestId,
+                timestamp: Date.now(),
+                response: {
+                    statusCode: httpResult.status ?? 0,
+                    statusMessage: httpResult.statusText || httpResult.message,
+                    headers: httpResult.headers ?? {},
+                    body:
+                        httpResult.data === undefined ? '' : JSON.stringify(httpResult.data),
+                    duration: httpResult.duration,
+                    size: serializedByteLength(httpResult.data),
+                },
+                error: {
+                    message: httpResult.message,
+                },
+            };
+            storage.addExecution(collectionId, requestId, execution);
+
+            return {
+                content: [{ type: 'text', text: JSON.stringify(errorResult, null, 2) }],
+            };
         },
     },
 ];
