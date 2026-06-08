@@ -1,25 +1,9 @@
-import axios from 'axios';
 import { insomniaStorage } from '../storage/insomnia-storage.js';
 import { storage } from '../storage/storage.js';
-import {
-    createExecutionAbortSignal,
-    getAbortErrorInfo,
-    resolveExecutionTimeoutMs,
-} from '../utils/http.js';
+import { executeHttpRequest } from '../utils/request-executor.js';
+import { resolveInsomniaEnvironmentVariables } from '../utils/env-resolver.js';
 import type { Tool, ToolExecutionContext } from '../types/tool.js';
 import type { InsomniaRequest } from '../types/request.js';
-
-function normalizeHeaders(headers: Record<string, unknown>): Record<string, string> {
-    const normalized: Record<string, string> = {};
-    for (const [key, value] of Object.entries(headers)) {
-        if (typeof value === 'string') {
-            normalized[key] = value;
-        } else if (Array.isArray(value)) {
-            normalized[key] = value.join(', ');
-        }
-    }
-    return normalized;
-}
 
 export const insomniaTools: Tool[] = [
     {
@@ -447,147 +431,35 @@ export const insomniaTools: Tool[] = [
                         text: rawReq.body.text,
                     }
                     : undefined,
+                authentication:
+                    Object.keys(rawReq.authentication).length > 0
+                        ? (rawReq.authentication as unknown as InsomniaRequest['authentication'])
+                        : undefined,
                 modified: rawReq.modified,
                 created: rawReq.created,
             };
 
-            const environmentVariables: Record<string, string | number | boolean> = {};
-            const warnings: Array<{ type: string; folderId?: string; message: string }> = [];
+            const { variables: environmentVariables, warnings } = resolveInsomniaEnvironmentVariables(
+                insomniaStorage,
+                {
+                    requestParentId: rawReq.parentId,
+                    environmentId,
+                    overrideVariables,
+                },
+            );
 
-            // Step 1: Get ancestor chain and workspace context
-            const ancestors = insomniaStorage.getAncestorChain(rawReq.parentId);
-            const workspaceAncestor = ancestors.find((a) => a.type === 'workspace');
-            const workspaceId = workspaceAncestor?.id || (rawReq.parentId.startsWith('wrk_') ? rawReq.parentId : null);
-
-            if (workspaceId) {
-                // Step 2: Merge Global Environment
-                const projectId = insomniaStorage.getWorkspaceProjectId(workspaceId);
-                if (projectId) {
-                    const globalEnv = insomniaStorage.getGlobalEnvironment(projectId);
-                    if (globalEnv?.data) {
-                        Object.assign(environmentVariables, globalEnv.data);
-                    }
-                }
-
-                // Step 3: Merge Base Environment
-                const baseEnv = insomniaStorage.getBaseEnvironment(workspaceId);
-                if (baseEnv?.data) {
-                    Object.assign(environmentVariables, baseEnv.data);
-                }
-            }
-
-            // Step 4: Merge Sub Environment (if specified)
-            if (environmentId) {
-                const allEnvs = insomniaStorage.getAllEnvironments();
-                const subEnv = allEnvs.find((e) => e._id === environmentId);
-                if (subEnv?.data) {
-                    Object.assign(environmentVariables, subEnv.data);
-                }
-            }
-
-            // Step 5: Merge Folder Environments (root → leaf order)
-            const folderIds = ancestors.filter((a) => a.type === 'folder').map((a) => a.id);
-            const allFolders = insomniaStorage.getAllRequestGroups();
-            for (const folderId of folderIds) {
-                const folder = allFolders.find((f) => f._id === folderId);
-                if (!folder) {
-                    warnings.push({
-                        type: 'FOLDER_NOT_FOUND',
-                        folderId,
-                        message: `Folder ${folderId} not found in hierarchy`,
-                    });
-                    continue;
-                }
-                if (Object.keys(folder.environment).length > 0) {
-                    Object.assign(environmentVariables, folder.environment);
-                }
-            }
-
-            // Step 6: Apply overrides
-            if (overrideVariables) {
-                Object.assign(environmentVariables, overrideVariables);
-            }
-
-            let processedUrl = targetRequest.url;
-            Object.entries(environmentVariables).forEach(([key, value]) => {
-                processedUrl = processedUrl.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-            });
-
-            const processedHeaders: Record<string, string> = {};
-            targetRequest.headers.forEach((header) => {
-                if (!header.disabled) {
-                    let processedValue = header.value;
-                    Object.entries(environmentVariables).forEach(([key, value]) => {
-                        processedValue = processedValue.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-                    });
-                    processedHeaders[header.name] = processedValue;
-                }
-            });
-
-            let processedBody: string | Record<string, unknown> | undefined = undefined;
-            if (targetRequest.body) {
-                if (targetRequest.body.graphql) {
-                    const gql = targetRequest.body.graphql;
-                    let variablesStr = gql.variables || '{}';
-                    Object.entries(environmentVariables).forEach(([key, value]) => {
-                        variablesStr = variablesStr.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-                    });
-
-                    let variables: unknown = {};
-                    try {
-                        variables = JSON.parse(variablesStr);
-                    } catch { }
-
-                    let query = gql.query;
-                    Object.entries(environmentVariables).forEach(([key, value]) => {
-                        query = query.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-                    });
-
-                    processedBody = {
-                        query: query,
-                        variables: variables,
-                    };
-                } else if (targetRequest.body.text) {
-                    processedBody = targetRequest.body.text;
-                    Object.entries(environmentVariables).forEach(([key, value]) => {
-                        if (typeof processedBody === 'string') {
-                            processedBody = processedBody.replace(new RegExp(`{{${key}}}`, 'g'), String(value));
-                        }
-                    });
-
-                    if (targetRequest.body.mimeType === 'application/json' || targetRequest.body.mimeType === 'application/graphql') {
-                        try {
-                            processedBody = JSON.parse(processedBody) as Record<string, unknown>;
-                        } catch { }
-                    }
-                }
-            }
-
-            const startTime = Date.now();
-            const resolvedTimeoutMs = resolveExecutionTimeoutMs(timeoutMs);
-            const executionSignal = createExecutionAbortSignal({
+            const httpResult = await executeHttpRequest({
+                request: targetRequest,
+                environmentVariables,
                 mcpSignal: context.signal,
                 timeoutMs,
+                validateStatus: () => true,
+                jsonMimeTypes: ['application/json', 'application/graphql'],
             });
 
-            try {
-                const response = await axios({
-                    method: targetRequest.method.toLowerCase() as
-                        | 'get'
-                        | 'post'
-                        | 'put'
-                        | 'delete'
-                        | 'patch'
-                        | 'head'
-                        | 'options',
-                    url: processedUrl,
-                    headers: processedHeaders,
-                    data: processedBody,
-                    signal: executionSignal,
-                    validateStatus: () => true,
-                });
+            const processedUrl = httpResult.processed.url;
 
-                const duration = Date.now() - startTime;
+            if (httpResult.kind === 'success') {
                 const result: Record<string, unknown> = {
                     success: true,
                     request: {
@@ -596,65 +468,25 @@ export const insomniaTools: Tool[] = [
                         url: processedUrl,
                     },
                     response: {
-                        status: response.status,
-                        statusText: response.statusText,
-                        headers: normalizeHeaders(response.headers as Record<string, unknown>),
-                        data: response.data as unknown,
-                        duration: `${String(duration)}ms`,
-                        size: JSON.stringify(response.data).length,
+                        status: httpResult.status,
+                        statusText: httpResult.statusText,
+                        headers: httpResult.headers,
+                        data: httpResult.rawData,
+                        duration: `${String(httpResult.duration)}ms`,
+                        size: JSON.stringify(httpResult.rawData).length,
                     },
                 };
 
-                if (warnings.length > 0) {
+                if (warnings && warnings.length > 0) {
                     result.warnings = warnings;
                 }
 
                 return {
-                    content: [
-                        {
-                            type: 'text',
-                            text: JSON.stringify(result, null, 2),
-                        },
-                    ],
+                    content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
                 };
-            } catch (error) {
-                const duration = Date.now() - startTime;
-                const abortInfo = getAbortErrorInfo(error, {
-                    mcpSignal: context.signal,
-                    executionSignal,
-                    timeoutMs: resolvedTimeoutMs,
-                });
+            }
 
-                if (abortInfo) {
-                    return {
-                        content: [
-                            {
-                                type: 'text',
-                                text: JSON.stringify(
-                                    {
-                                        success: false,
-                                        cancelled: true,
-                                        cancelReason: abortInfo.cancelReason,
-                                        request: {
-                                            name: targetRequest.name,
-                                            method: targetRequest.method,
-                                            url: processedUrl,
-                                        },
-                                        error: {
-                                            message: abortInfo.message,
-                                            duration: `${String(duration)}ms`,
-                                        },
-                                    },
-                                    null,
-                                    2,
-                                ),
-                            },
-                        ],
-                    };
-                }
-
-                const err = error as Error & { code?: string };
-
+            if (httpResult.kind === 'cancelled') {
                 return {
                     content: [
                         {
@@ -662,15 +494,16 @@ export const insomniaTools: Tool[] = [
                             text: JSON.stringify(
                                 {
                                     success: false,
+                                    cancelled: true,
+                                    cancelReason: httpResult.cancelReason,
                                     request: {
                                         name: targetRequest.name,
                                         method: targetRequest.method,
                                         url: processedUrl,
                                     },
                                     error: {
-                                        message: err.message,
-                                        code: err.code,
-                                        duration: `${String(duration)}ms`,
+                                        message: httpResult.message,
+                                        duration: `${String(httpResult.duration)}ms`,
                                     },
                                 },
                                 null,
@@ -680,6 +513,31 @@ export const insomniaTools: Tool[] = [
                     ],
                 };
             }
+
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify(
+                            {
+                                success: false,
+                                request: {
+                                    name: targetRequest.name,
+                                    method: targetRequest.method,
+                                    url: processedUrl,
+                                },
+                                error: {
+                                    message: httpResult.message,
+                                    code: httpResult.code,
+                                    duration: `${String(httpResult.duration)}ms`,
+                                },
+                            },
+                            null,
+                            2,
+                        ),
+                    },
+                ],
+            };
         },
     },
 ];
