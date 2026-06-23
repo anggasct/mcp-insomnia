@@ -1,6 +1,6 @@
 # MCP-Insomnia
 
-MCP-Insomnia is an MCP (Model Context Protocol) server that enables AI agents to create and manage API collections in Insomnia-compatible format. This server provides tools and resources for managing collections, requests, and environments that can be exported to Insomnia.
+MCP-Insomnia is an MCP (Model Context Protocol) server that enables AI agents to create and manage API collections in Insomnia-compatible format. This server provides tools for managing collections, requests, and environments that can be exported to Insomnia.
 
 ## Installation and Usage
 
@@ -85,8 +85,7 @@ npm run build
 - `get_collection_detail` - Get full details and statistics of a collection
 - `export_collection` - Export collection to JSON format
 
-
-### Folder Management  
+### Folder Management
 
 - `create_folder` - Create folder within collection
 
@@ -97,16 +96,19 @@ npm run build
 - `create_request_in_collection` - Create new request
 - `update_request` - Update existing request
 - `delete_request` - Delete request
-- `execute_request` - Execute request and view response
-- `get_request_history` - Get execution history of a request
-- `generate_code_snippet` - Generate a code snippet for a request in various languages/frameworks
+- `execute_request` - Execute an MCP-stored request and return the response (supports environment resolution, timeouts, and response size limits — see [Request execution](#request-execution))
+- `get_request_history` - Get execution history of a request (up to 20 entries per request)
 
 ### Import Tools
 
 - `import_from_curl` - Parse cURL command into a request
 - `import_from_postman` - Import Postman Collection (v2.1) JSON
-- `import_from_openapi` - Import OpenAPI/Swagger (v3.0) JSON
+- `import_from_openapi` - Import OpenAPI 3.x or Swagger 2.x JSON
 - `import_from_insomnia_export` - Import collections from a standard Insomnia V4 export file
+
+### Utility Tools
+
+- `generate_code_snippet` - Generate a code snippet for a request. Requires `requestId` and `target`. Supported targets: `c`, `clojure`, `csharp`, `go`, `http`, `java`, `javascript`, `kotlin`, `node`, `objc`, `ocaml`, `php`, `powershell`, `python`, `ruby`, `shell`, `swift`. Optional `client` selects a library (e.g. `axios` for `javascript`, `curl` for `shell`).
 
 ### Insomnia Direct Integration (NeDB)
 
@@ -119,12 +121,41 @@ Interact directly with the local Insomnia application database (macOS, Linux, Wi
 - `sync_from_insomnia` - Import a workspace from Insomnia to MCP
 - `sync_all_from_insomnia` - Import all workspaces from Insomnia to MCP
 - `sync_to_insomnia` - Export an MCP collection back to Insomnia
-- `execute_insomnia_request` - Execute a request directly from Insomnia (with env support)
+- `execute_insomnia_request` - Execute a request directly from Insomnia without syncing (supports environment resolution and timeouts — see [Request execution](#request-execution))
 
 ### Environment Management
 
 - `set_environment_variable` - Set environment variable
 - `get_environment_variables` - Get environment variables
+
+When executing requests, environment variables are merged in layers (later layers override earlier ones):
+
+**MCP collections** (`execute_request`):
+1. Workspace/base environments attached to the collection
+2. Sub-environment (`environmentId`, if provided)
+3. Folder environments along the request's ancestor chain
+4. `overrideVariables` (per-call overrides)
+5. `environmentVariables` (legacy final override layer)
+
+**Insomnia app** (`execute_insomnia_request`):
+1. Global environment (project level)
+2. Base environment (workspace level)
+3. Sub-environment (`environmentId`, if provided)
+4. Folder environments along the request's ancestor chain
+5. `overrideVariables` (per-call overrides)
+
+### Request execution
+
+Both execution tools accept optional runtime parameters:
+
+| Parameter | `execute_request` | `execute_insomnia_request` | Description |
+|-----------|:-:|:-:|-------------|
+| `requestId` | ✓ | ✓ | ID of the request to run |
+| `environmentId` | ✓ | ✓ | Sub-environment ID for variable substitution |
+| `overrideVariables` | ✓ | ✓ | Per-call variable overrides (e.g. `{"token": "abc123"}`) |
+| `environmentVariables` | ✓ | | Legacy final override layer for MCP collections |
+| `timeoutMs` | ✓ | ✓ | Request timeout in ms (default `30000`; set `<= 0` for no timeout — MCP cancellation still applies) |
+| `maxResponseBytes` | ✓ | | Max serialized response body size in tool output; exceeded bodies are truncated to a preview |
 
 ### Search & Statistics
 
@@ -160,10 +191,16 @@ Set Insomnia environment variable "baseUrl" with value "https://api.example.com"
 Execute "Get Users" request using the configured environment variables
 ```
 
+With optional parameters:
+
+```
+Execute request req_abc123 with environmentId env_xyz, timeout 15000ms, and override baseUrl to https://staging.api.example.com
+```
+
 ### Generate Code Snippet
 
 ```
-Generate a code snippet for Insomnia request "Get Users" in "javascript"
+Generate a code snippet for request req_abc123 in javascript using axios
 ```
 
 ## Data Storage
@@ -207,7 +244,7 @@ If Insomnia is installed in a non-default location, you can set the `INSOMNIA_DA
 
 **Scenario A: Creating/Modifying Content**
 1. **Import/Fetch**: Pull data from Insomnia (`sync_from_insomnia` or `import_from_openapi`)
-2. **Edit**: Modify requests/folders using MCP tools (`create_request`, `update_request`)
+2. **Edit**: Modify requests/folders using MCP tools (`create_request_in_collection`, `update_request`)
 3. **Publish**: Sync changes back to Insomnia (`sync_to_insomnia`)
 
 **Scenario B: Running Existing Requests**
