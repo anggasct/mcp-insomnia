@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/anggasct/mcp-insomnia/compare/v0.7.0...v0.7.1) (2026-06-23)
+
+
+### Bug Fixes
+
+* **deps:** resolve open Dependabot alerts and update README ([#23](https://github.com/anggasct/mcp-insomnia/issues/23)) ([3b00251](https://github.com/anggasct/mcp-insomnia/commit/3b002511899fa5a891cf5301fc53b7a64c4ec06a))
+
 ## [0.7.0](https://github.com/anggasct/mcp-insomnia/compare/v0.6.0...v0.7.0) (2026-06-08)
 
 
