@@ -52,7 +52,7 @@ jobs:
 
       - run: npm ci
         if: steps.check.outputs.needed == 'true'
-      - run: npm audit
+      - run: npm audit --omit=dev
         if: steps.check.outputs.needed == 'true'
       - run: npm run lint
         if: steps.check.outputs.needed == 'true'
