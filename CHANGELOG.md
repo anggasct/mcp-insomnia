@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.3](https://github.com/anggasct/mcp-insomnia/compare/v0.7.2...v0.7.3) (2026-07-29)
+
+
+### Bug Fixes
+
+* **ci:** scope publish npm audit to production deps only ([dd5ce43](https://github.com/anggasct/mcp-insomnia/commit/dd5ce43255374dd0ced45dd36f77502d5f03cba3))
+
 ## [0.7.2](https://github.com/anggasct/mcp-insomnia/compare/v0.7.1...v0.7.2) (2026-07-29)
 
 
