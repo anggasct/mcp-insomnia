@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.2](https://github.com/anggasct/mcp-insomnia/compare/v0.7.1...v0.7.2) (2026-07-29)
+
+
+### Bug Fixes
+
+* **ci:** patch postcss and scope npm audit to production deps ([43f9055](https://github.com/anggasct/mcp-insomnia/commit/43f90559bc509152a0422f7c65ab2a300369cda2))
+* **deps:** resolve open Dependabot security alerts ([b78eeca](https://github.com/anggasct/mcp-insomnia/commit/b78eeca9b4a49184985fcdda45fe51f664f80972))
+
 ## [0.7.1](https://github.com/anggasct/mcp-insomnia/compare/v0.7.0...v0.7.1) (2026-06-23)
 
 
