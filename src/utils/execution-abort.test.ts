@@ -86,7 +86,7 @@ describe('getAbortErrorInfo', () => {
 
     it('detects timeout cancellation', () => {
         const executionSignal = AbortSignal.timeout(1000);
-        const cancelError = new CanceledError('timeout', 'ERR_CANCELED');
+        const cancelError = new CanceledError('timeout');
         const info = getAbortErrorInfo(cancelError, {
             executionSignal,
             timeoutMs: 1000,
@@ -106,7 +106,7 @@ describe('getAbortErrorInfo', () => {
             mcpSignal: mcpController.signal,
             timeoutMs: 5000,
         });
-        const cancelError = new CanceledError('cancelled', 'ERR_CANCELED');
+        const cancelError = new CanceledError('cancelled');
 
         const info = getAbortErrorInfo(cancelError, {
             mcpSignal: mcpController.signal,
