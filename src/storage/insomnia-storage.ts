@@ -58,7 +58,9 @@ export class InsomniaStorage {
         return `Insomnia data directory not found. Checked:\n${pathsList}\n\nSet INSOMNIA_DATA_DIR environment variable to specify a custom path.`;
     }
 
-    private readNeDB<T>(filename: string): T[] {
+    private readNeDB<T extends { _id?: string; modified?: number; $$deleted?: boolean }>(
+        filename: string,
+    ): T[] {
         const filePath = path.join(this.insomniaDir, filename);
         if (!fs.existsSync(filePath)) {
             return [];
@@ -67,15 +69,34 @@ export class InsomniaStorage {
         const content = fs.readFileSync(filePath, 'utf-8');
         const lines = content.split('\n').filter((line) => line.trim());
 
-        return lines
-            .map((line) => {
-                try {
-                    return JSON.parse(line) as T;
-                } catch {
-                    return null;
-                }
-            })
-            .filter((item): item is T => item !== null);
+        // NeDB append-only stores: multiple revisions per _id, and soft-deletes via $$deleted.
+        // Collapse to the latest non-deleted revision so callers never see duplicates/stale rows.
+        const latestById = new Map<string, T>();
+
+        for (const line of lines) {
+            let item: T;
+            try {
+                item = JSON.parse(line) as T;
+            } catch {
+                continue;
+            }
+
+            if (!item || typeof item !== 'object' || !item._id) {
+                continue;
+            }
+
+            if (item.$$deleted) {
+                latestById.delete(item._id);
+                continue;
+            }
+
+            const prev = latestById.get(item._id);
+            if (!prev || (item.modified || 0) >= (prev.modified || 0)) {
+                latestById.set(item._id, item);
+            }
+        }
+
+        return Array.from(latestById.values());
     }
 
     private writeNeDB(filename: string, records: unknown[]): void {
@@ -360,7 +381,14 @@ export class InsomniaStorage {
         };
     }
 
-    private convertRequest(raw: InsomniaRequestRaw): InsomniaRequest {
+    convertRequest(raw: InsomniaRequestRaw): InsomniaRequest {
+        // Real Insomnia NeDB rows often store null for these fields.
+        const headers = Array.isArray(raw.headers) ? raw.headers : [];
+        const parameters = Array.isArray(raw.parameters) ? raw.parameters : [];
+        const body = raw.body && typeof raw.body === 'object' ? raw.body : {};
+        const authentication =
+            raw.authentication && typeof raw.authentication === 'object' ? raw.authentication : {};
+
         return {
             _id: raw._id,
             _type: 'request',
@@ -369,28 +397,33 @@ export class InsomniaStorage {
             description: raw.description,
             url: raw.url,
             method: raw.method as InsomniaRequest['method'],
-            headers: raw.headers.map((h) => ({
+            headers: headers.map((h) => ({
                 name: h.name,
                 value: h.value,
                 description: h.description,
                 disabled: h.disabled,
             })),
-            parameters: raw.parameters.map((p) => ({
+            parameters: parameters.map((p) => ({
                 name: p.name,
                 value: p.value,
                 disabled: p.disabled,
             })),
             body: {
-                mimeType: raw.body.mimeType,
-                text: raw.body.text,
+                mimeType: body.mimeType,
+                text: body.text,
             },
             authentication:
-                Object.keys(raw.authentication).length > 0
-                    ? (raw.authentication as unknown as InsomniaRequest['authentication'])
+                Object.keys(authentication).length > 0
+                    ? (authentication as unknown as InsomniaRequest['authentication'])
                     : undefined,
             modified: raw.modified,
             created: raw.created,
         };
+    }
+
+    getRequestById(requestId: string): InsomniaRequest | null {
+        const raw = this.getAllRequests().find((r) => r._id === requestId);
+        return raw ? this.convertRequest(raw) : null;
     }
 
     private convertRequestGroup(raw: InsomniaRequestGroupRaw): InsomniaRequestGroup {
@@ -412,7 +445,7 @@ export class InsomniaStorage {
             _type: 'environment',
             parentId: raw.parentId,
             name: raw.name,
-            data: raw.data,
+            data: raw.data && typeof raw.data === 'object' ? raw.data : {},
             isPrivate: raw.isPrivate,
             modified: raw.modified,
             created: raw.created,
@@ -472,7 +505,7 @@ interface InsomniaWorkspaceRaw {
     scope: string;
 }
 
-interface InsomniaRequestRaw {
+export interface InsomniaRequestRaw {
     _id: string;
     type: 'Request';
     parentId: string;
@@ -482,23 +515,23 @@ interface InsomniaRequestRaw {
     name: string;
     description: string;
     method: string;
-    body: {
+    body?: {
         mimeType?: string;
         text?: string;
-    };
-    parameters: Array<{
+    } | null;
+    parameters?: Array<{
         name: string;
         value: string;
         disabled?: boolean;
-    }>;
-    headers: Array<{
+    }> | null;
+    headers?: Array<{
         name: string;
         value: string;
         id?: string;
         disabled?: boolean;
         description?: string;
-    }>;
-    authentication: Record<string, unknown>;
+    }> | null;
+    authentication?: Record<string, unknown> | null;
     metaSortKey: number;
     isPrivate: boolean;
     settingStoreCookies: boolean;
@@ -528,7 +561,7 @@ interface InsomniaEnvironmentRaw {
     modified: number;
     created: number;
     name: string;
-    data: Record<string, string | number | boolean>;
+    data?: Record<string, string | number | boolean> | null;
     isPrivate: boolean;
     metaSortKey: number;
 }

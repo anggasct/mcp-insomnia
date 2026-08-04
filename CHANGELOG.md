@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Bug Fixes
+
+* **insomnia:** tolerate null request fields and collapse NeDB revisions when reading live Insomnia DBs
+
 ## [0.7.3](https://github.com/anggasct/mcp-insomnia/compare/v0.7.2...v0.7.3) (2026-07-29)
 
 
