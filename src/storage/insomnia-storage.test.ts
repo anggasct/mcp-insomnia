@@ -145,6 +145,56 @@ describe('InsomniaStorage NeDB hardening', () => {
         expect(storage.getRequestById('req_del')).toBeNull();
     });
 
+    it('assigns unique header pair ids when writing raw requests', () => {
+        const storage = makeStorage({});
+        const converted = storage.convertRequest({
+            _id: 'req_ids',
+            type: 'Request',
+            parentId: 'wrk_1',
+            modified: 1,
+            created: 1,
+            url: 'https://example.com',
+            name: 'ids',
+            description: '',
+            method: 'GET',
+            body: {},
+            parameters: [],
+            headers: [
+                { name: 'a', value: '1' },
+                { name: 'b', value: '2' },
+                { name: 'c', value: '3' },
+            ],
+            authentication: {},
+            metaSortKey: -1,
+            isPrivate: false,
+            settingStoreCookies: true,
+            settingSendCookies: true,
+            settingDisableRenderRequestBody: false,
+            settingEncodeUrl: true,
+            settingRebuildPath: true,
+            settingFollowRedirects: 'global',
+        });
+
+        // Force write path through private convert via saveRequest
+        storage.saveRequest({
+            ...converted,
+            headers: [
+                { name: 'a', value: '1' },
+                { name: 'b', value: '2' },
+                { name: 'c', value: '3' },
+            ],
+            parameters: [],
+            modified: Date.now(),
+            created: Date.now(),
+        });
+
+        const raw = storage.getAllRequests().find((r) => r._id === 'req_ids');
+        expect(raw?.headers).toHaveLength(3);
+        const ids = (raw?.headers || []).map((h) => h.id);
+        expect(new Set(ids).size).toBe(3);
+        expect(ids.every((id) => typeof id === 'string' && id.startsWith('pair_'))).toBe(true);
+    });
+
     it('converts requests with null headers/parameters/body/authentication', () => {
         const storage = makeStorage({});
         const raw = {

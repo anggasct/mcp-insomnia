@@ -1,9 +1,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { randomUUID } from 'node:crypto';
 import type { CollectionStructure, InsomniaWorkspace, InsomniaRequestGroup } from '../types/collection.js';
 import type { InsomniaRequest } from '../types/request.js';
 import type { InsomniaEnvironment } from '../types/environment.js';
+
+function newPairId(): string {
+    return `pair_${randomUUID().replace(/-/g, '')}`;
+}
 
 export class InsomniaStorage {
     private readonly insomniaDir: string;
@@ -398,12 +403,14 @@ export class InsomniaStorage {
             url: raw.url,
             method: raw.method as InsomniaRequest['method'],
             headers: headers.map((h) => ({
+                id: h.id,
                 name: h.name,
                 value: h.value,
                 description: h.description,
                 disabled: h.disabled,
             })),
             parameters: parameters.map((p) => ({
+                id: p.id,
                 name: p.name,
                 value: p.value,
                 disabled: p.disabled,
@@ -470,14 +477,17 @@ export class InsomniaStorage {
                   }
                 : {},
             parameters: request.parameters.map((p) => ({
+                id: p.id || newPairId(),
                 name: p.name,
                 value: p.value,
                 disabled: p.disabled || false,
             })),
+            // Insomnia React keys pair rows by `id`. Date.now() collides inside one map()
+            // and breaks the UI with "Render Failure: Invalid array length".
             headers: request.headers.map((h) => ({
                 name: h.name,
                 value: h.value,
-                id: `pair_${String(Date.now())}`,
+                id: h.id || newPairId(),
                 disabled: h.disabled || false,
                 description: h.description,
             })),
@@ -522,6 +532,7 @@ export interface InsomniaRequestRaw {
     parameters?: Array<{
         name: string;
         value: string;
+        id?: string;
         disabled?: boolean;
     }> | null;
     headers?: Array<{
