@@ -10,6 +10,25 @@ function newPairId(): string {
     return `pair_${randomUUID().replace(/-/g, '')}`;
 }
 
+function isValidPairId(id: unknown): id is string {
+    return typeof id === 'string' && id.trim().length > 0;
+}
+
+/** Keep an existing pair id only when it is valid and unused in this list. */
+function ensureUniquePairId(id: unknown, used: Set<string>): string {
+    if (isValidPairId(id) && !used.has(id)) {
+        used.add(id);
+        return id;
+    }
+
+    let next = newPairId();
+    while (used.has(next)) {
+        next = newPairId();
+    }
+    used.add(next);
+    return next;
+}
+
 export class InsomniaStorage {
     private readonly insomniaDir: string;
     private readonly checkedPaths: string[];
@@ -75,7 +94,8 @@ export class InsomniaStorage {
         const lines = content.split('\n').filter((line) => line.trim());
 
         // NeDB append-only stores: multiple revisions per _id, and soft-deletes via $$deleted.
-        // Collapse to the latest non-deleted revision so callers never see duplicates/stale rows.
+        // Replay in file order — later live rows replace earlier ones for the same _id,
+        // and $$deleted removes the id (even if modified is missing or clock-skewed).
         const latestById = new Map<string, T>();
 
         for (const line of lines) {
@@ -95,10 +115,7 @@ export class InsomniaStorage {
                 continue;
             }
 
-            const prev = latestById.get(item._id);
-            if (!prev || (item.modified || 0) >= (prev.modified || 0)) {
-                latestById.set(item._id, item);
-            }
+            latestById.set(item._id, item);
         }
 
         return Array.from(latestById.values());
@@ -476,21 +493,27 @@ export class InsomniaStorage {
                       text: request.body.text || '',
                   }
                 : {},
-            parameters: request.parameters.map((p) => ({
-                id: p.id || newPairId(),
-                name: p.name,
-                value: p.value,
-                disabled: p.disabled || false,
-            })),
-            // Insomnia React keys pair rows by `id`. Date.now() collides inside one map()
-            // and breaks the UI with "Render Failure: Invalid array length".
-            headers: request.headers.map((h) => ({
-                name: h.name,
-                value: h.value,
-                id: h.id || newPairId(),
-                disabled: h.disabled || false,
-                description: h.description,
-            })),
+            // Insomnia React keys pair rows by `id`. Missing/duplicate/invalid ids
+            // break the UI with "Render Failure: Invalid array length".
+            parameters: (() => {
+                const used = new Set<string>();
+                return request.parameters.map((p) => ({
+                    id: ensureUniquePairId(p.id, used),
+                    name: p.name,
+                    value: p.value,
+                    disabled: p.disabled || false,
+                }));
+            })(),
+            headers: (() => {
+                const used = new Set<string>();
+                return request.headers.map((h) => ({
+                    name: h.name,
+                    value: h.value,
+                    id: ensureUniquePairId(h.id, used),
+                    disabled: h.disabled || false,
+                    description: h.description,
+                }));
+            })(),
             authentication: (request.authentication || {}) as Record<string, unknown>,
             metaSortKey: -Date.now(),
             isPrivate: false,
