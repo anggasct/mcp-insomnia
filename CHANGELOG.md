@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.8.0](https://github.com/anggasct/mcp-insomnia/compare/v0.7.3...v0.8.0) (2026-08-04)
+
+
+### Features
+
+* add environment merging, and storage helpers ([41fa82d](https://github.com/anggasct/mcp-insomnia/commit/41fa82df4ed6fdcb34c20b82b170a9841d288ac1))
+* Add generate_code_snippet tool ([a6b854b](https://github.com/anggasct/mcp-insomnia/commit/a6b854b6c1dcf025cf1d414b7aa86e6d4abb6392))
+* custom Insomnia paths & replace resources with tools ([a20b930](https://github.com/anggasct/mcp-insomnia/commit/a20b9309892ab69d1c0c984b619c9616677e9579))
+* harden execution tools with response cap, abort, and check gate ([#18](https://github.com/anggasct/mcp-insomnia/issues/18)) ([970c69a](https://github.com/anggasct/mcp-insomnia/commit/970c69aad38a59d3cbcc8bec13ebf517ceabfe91))
+* initial MCP Insomnia server implementation ([0650628](https://github.com/anggasct/mcp-insomnia/commit/0650628a8434fd07888c2d177c83dd3b20dbb5aa))
+* share execute logic and add internal env cascade ([#20](https://github.com/anggasct/mcp-insomnia/issues/20)) ([090eda5](https://github.com/anggasct/mcp-insomnia/commit/090eda5adf185d61c8292f6fe119aa66fff2526b))
+* v0.3.0 - Insomnia Integration & Imports ([a6e9bd1](https://github.com/anggasct/mcp-insomnia/commit/a6e9bd18f5510bff192aea4424910002a55f9046))
+
+
+### Bug Fixes
+
+* **ci:** bump audit overrides (fast-uri, hono, ip-address) ([#31](https://github.com/anggasct/mcp-insomnia/issues/31)) ([17a0893](https://github.com/anggasct/mcp-insomnia/commit/17a08932e22a2f2861491699a1f0a0d33f925bc7))
+* **ci:** patch postcss and scope npm audit to production deps ([43f9055](https://github.com/anggasct/mcp-insomnia/commit/43f90559bc509152a0422f7c65ab2a300369cda2))
+* **ci:** remove npm@latest upgrade, pin to setup-node built-in npm 10.x ([#12](https://github.com/anggasct/mcp-insomnia/issues/12)) ([c546926](https://github.com/anggasct/mcp-insomnia/commit/c54692620d3024c79fd24b8144926bf69f1567fc))
+* **ci:** restore npm publish via workflow_run and OIDC ([#14](https://github.com/anggasct/mcp-insomnia/issues/14)) ([4148b16](https://github.com/anggasct/mcp-insomnia/commit/4148b161d7fd63db340256eee864ffb04440b0d3))
+* **ci:** scope publish npm audit to production deps only ([dd5ce43](https://github.com/anggasct/mcp-insomnia/commit/dd5ce43255374dd0ced45dd36f77502d5f03cba3))
+* **deps:** resolve all dependabot vulnerabilities ([#8](https://github.com/anggasct/mcp-insomnia/issues/8)) ([d07b7bc](https://github.com/anggasct/mcp-insomnia/commit/d07b7bcab358d61ea262ce307811f558a63bf891))
+* **deps:** resolve all npm vulnerabilities ([#10](https://github.com/anggasct/mcp-insomnia/issues/10)) ([4aa5f50](https://github.com/anggasct/mcp-insomnia/commit/4aa5f501c73a5e55c0dae7430e2738850ee972ee))
+* **deps:** resolve open Dependabot alerts and update README ([#23](https://github.com/anggasct/mcp-insomnia/issues/23)) ([3b00251](https://github.com/anggasct/mcp-insomnia/commit/3b002511899fa5a891cf5301fc53b7a64c4ec06a))
+* **deps:** resolve open Dependabot security alerts ([b78eeca](https://github.com/anggasct/mcp-insomnia/commit/b78eeca9b4a49184985fcdda45fe51f664f80972))
+* **deps:** update vulnerable dependencies ([#4](https://github.com/anggasct/mcp-insomnia/issues/4)) ([fb6a042](https://github.com/anggasct/mcp-insomnia/commit/fb6a0424dc0bbe882c17d0821fcff454dd5fed85))
+* **deps:** update vulnerable dependencies ([#5](https://github.com/anggasct/mcp-insomnia/issues/5)) ([1d19852](https://github.com/anggasct/mcp-insomnia/commit/1d198521e4b24da03735127e37595b8bc2e4cfbf))
+* read server version from package.json and harden request parsing ([#16](https://github.com/anggasct/mcp-insomnia/issues/16)) ([65a50c8](https://github.com/anggasct/mcp-insomnia/commit/65a50c871659fe6ed1616eda89444c764a63b081))
+
 ## [0.7.3](https://github.com/anggasct/mcp-insomnia/compare/v0.7.2...v0.7.3) (2026-07-29)
 
 
