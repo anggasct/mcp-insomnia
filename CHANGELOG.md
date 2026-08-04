@@ -7,6 +7,14 @@
 * **insomnia:** tolerate null request fields and collapse NeDB revisions when reading live Insomnia DBs
 * **insomnia:** assign unique `pair_*` ids for headers/parameters on write (fixes Insomnia `Invalid array length` after sync)
 
+## [0.7.4](https://github.com/anggasct/mcp-insomnia/compare/v0.7.3...v0.7.4) (2026-08-04)
+
+
+### Bug Fixes
+
+* **ci:** bump audit overrides (fast-uri, hono, ip-address) ([#31](https://github.com/anggasct/mcp-insomnia/issues/31)) ([17a0893](https://github.com/anggasct/mcp-insomnia/commit/17a08932e22a2f2861491699a1f0a0d33f925bc7))
+* harden Insomnia NeDB reads (null fields, revisions, unique pair ids) ([#30](https://github.com/anggasct/mcp-insomnia/issues/30)) ([0817a5f](https://github.com/anggasct/mcp-insomnia/commit/0817a5f768225ca1adb83c18f6722c14c2f3b822))
+
 ## [0.7.3](https://github.com/anggasct/mcp-insomnia/compare/v0.7.2...v0.7.3) (2026-07-29)
 
 
