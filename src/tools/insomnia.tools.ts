@@ -3,8 +3,6 @@ import { storage } from '../storage/storage.js';
 import { executeHttpRequest } from '../utils/request-executor.js';
 import { resolveInsomniaEnvironmentVariables } from '../utils/env-resolver.js';
 import type { Tool, ToolExecutionContext } from '../types/tool.js';
-import type { InsomniaRequest } from '../types/request.js';
-
 export const insomniaTools: Tool[] = [
     {
         name: 'list_insomnia_collections',
@@ -135,7 +133,7 @@ export const insomniaTools: Tool[] = [
                                     environments: collection.environments.map((e) => ({
                                         id: e._id,
                                         name: e.name,
-                                        variableCount: Object.keys(e.data).length,
+                                        variableCount: Object.keys(e.data || {}).length,
                                     })),
                                 },
                             },
@@ -401,48 +399,16 @@ export const insomniaTools: Tool[] = [
                 throw new Error(insomniaStorage.getNotInstalledMessage());
             }
 
-            const allRequests = insomniaStorage.getAllRequests();
-            const rawReq = allRequests.find((r) => r._id === requestId);
+            const targetRequest = insomniaStorage.getRequestById(requestId);
 
-            if (!rawReq) {
+            if (!targetRequest) {
                 throw new Error(`Request with ID ${requestId} not found in Insomnia`);
             }
-
-            const targetRequest: InsomniaRequest = {
-                _id: rawReq._id,
-                _type: 'request',
-                parentId: rawReq.parentId,
-                name: rawReq.name,
-                url: rawReq.url,
-                method: rawReq.method as InsomniaRequest['method'],
-                headers: rawReq.headers.map((h) => ({
-                    name: h.name,
-                    value: h.value,
-                    disabled: h.disabled,
-                })),
-                parameters: rawReq.parameters.map((p) => ({
-                    name: p.name,
-                    value: p.value,
-                    disabled: p.disabled,
-                })),
-                body: rawReq.body.text
-                    ? {
-                        mimeType: rawReq.body.mimeType,
-                        text: rawReq.body.text,
-                    }
-                    : undefined,
-                authentication:
-                    Object.keys(rawReq.authentication).length > 0
-                        ? (rawReq.authentication as unknown as InsomniaRequest['authentication'])
-                        : undefined,
-                modified: rawReq.modified,
-                created: rawReq.created,
-            };
 
             const { variables: environmentVariables, warnings } = resolveInsomniaEnvironmentVariables(
                 insomniaStorage,
                 {
-                    requestParentId: rawReq.parentId,
+                    requestParentId: targetRequest.parentId || '',
                     environmentId,
                     overrideVariables,
                 },
