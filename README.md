@@ -1,3 +1,5 @@
+
+
 # MCP-Insomnia
 
 MCP-Insomnia is an MCP (Model Context Protocol) server that enables AI agents to create and manage API collections in Insomnia-compatible format. This server provides tools for managing collections, requests, and environments that can be exported to Insomnia.
@@ -22,7 +24,7 @@ You can run `mcp-insomnia` directly using `npx` without a global installation.
   "mcpServers": {
     "insomnia": {
       "command": "npx",
-      "args": ["mcp-insomnia"]
+      "args": ["-y", "mcp-insomnia"]
     }
   }
 }
