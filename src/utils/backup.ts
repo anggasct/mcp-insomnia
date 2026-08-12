@@ -55,6 +55,24 @@ function compactIso(d: Date): string {
     return d.toISOString().replace(/[-:.]/g, '');
 }
 
+function fsyncBestEffort(filePath: string): void {
+    let fd: number | undefined;
+    try {
+        fd = fs.openSync(filePath, 'r');
+        fs.fsyncSync(fd);
+    } catch {
+        // best-effort: some filesystems (tmpfs/network) do not support fsync
+    } finally {
+        if (fd !== undefined) {
+            try {
+                fs.closeSync(fd);
+            } catch {
+                // ignore
+            }
+        }
+    }
+}
+
 function readManifest(backupDir: string): Manifest {
     const file = path.join(backupDir, MANIFEST);
     if (!fs.existsSync(file)) return { backups: [] };
@@ -147,6 +165,7 @@ export function writeBackup(args: WriteBackupArgs): WriteBackupResult {
     });
 
     fs.writeFileSync(tmpPath, json, 'utf-8');
+    fsyncBestEffort(tmpPath);
     rename(tmpPath, finalPath);
     fs.writeFileSync(`${finalPath}.sha256`, `${sha256}  ${baseName}\n`, 'utf-8');
 

@@ -1,4 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import type { CollectionStructure, InsomniaWorkspace, InsomniaRequestGroup } from '../types/collection.js';
 import type { InsomniaRequest } from '../types/request.js';
 import type { InsomniaEnvironment } from '../types/environment.js';
@@ -106,10 +110,11 @@ beforeEach(() => {
 });
 
 describe('preview_sync_to_insomnia', () => {
-    it('classifies all source docs as toCreate when target is absent', async () => {
+    it('classifies all source docs as toCreate when target is absent and writes nothing', async () => {
         state.collections.set(WS_ID, sourceCollection());
         state.target = null;
 
+        const before = state.collections.get(WS_ID);
         const out = await run('preview_sync_to_insomnia', { collectionId: WS_ID });
 
         const summary = out.summary as Record<string, number>;
@@ -118,6 +123,9 @@ describe('preview_sync_to_insomnia', () => {
         expect(summary.toDelete).toBe(0);
         expect(summary.unchanged).toBe(0);
         expect(out.warnings).toEqual([]);
+        expect(state.savedWorkspaces).toBe(0);
+        expect(state.savedRequests).toBe(0);
+        expect(state.collections.get(WS_ID)).toBe(before);
     });
 
     it('throws when Insomnia is not installed', async () => {
@@ -179,5 +187,32 @@ describe('delete_request dryRun', () => {
         const out = await run('delete_request', { requestId: 'req_missing', dryRun: true });
         expect(out.success).toBe(false);
         expect(out.error).toBe('not found');
+    });
+});
+
+describe('sync_to_insomnia backup (end-to-end)', () => {
+    it('writes a backup snapshot then proceeds with the sync', async () => {
+        const backupDir = fs.mkdtempSync(path.join(os.tmpdir(), `mcp-sync-backup-${randomUUID().slice(0, 8)}-`));
+        const prev = process.env.MCP_INSOMNIA_BACKUP_DIR;
+        process.env.MCP_INSOMNIA_BACKUP_DIR = backupDir;
+        try {
+            state.collections.set(WS_ID, sourceCollection());
+            state.target = sourceCollection();
+
+            const out = await run('sync_to_insomnia', { collectionId: WS_ID, backup: true });
+
+            expect(out.success).toBe(true);
+            const backup = out.backup as Record<string, unknown>;
+            expect(backup.sha256).toMatch(/^[0-9a-f]{64}$/);
+            const files = fs.readdirSync(backupDir).filter((f) => f.startsWith('backup-') && f.endsWith('.json'));
+            expect(files).toHaveLength(1);
+            expect(fs.existsSync(path.join(backupDir, `${files[0]}.sha256`))).toBe(true);
+            expect(fs.existsSync(path.join(backupDir, 'manifest.json'))).toBe(true);
+            expect(state.savedWorkspaces).toBeGreaterThan(0);
+        } finally {
+            if (prev === undefined) delete process.env.MCP_INSOMNIA_BACKUP_DIR;
+            else process.env.MCP_INSOMNIA_BACKUP_DIR = prev;
+            fs.rmSync(backupDir, { recursive: true, force: true });
+        }
     });
 });

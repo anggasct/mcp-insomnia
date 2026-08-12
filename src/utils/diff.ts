@@ -42,7 +42,7 @@ function stable(value: unknown): Json {
 type Pair = { name: string; value: string; disabled?: boolean; description?: string };
 
 function pairKey(p: Pair): string {
-    return JSON.stringify([p.name ?? '', p.value ?? '', p.disabled ?? false, p.description ?? '']);
+    return JSON.stringify([p.name, p.value, p.disabled ?? false, p.description ?? '']);
 }
 
 function sortPairs<T extends Pair>(pairs: T[]): T[] {
@@ -94,7 +94,7 @@ function projectEnvironment(e: InsomniaEnvironment): Json {
     return stable({
         name: e.name,
         parentId: e.parentId ?? '',
-        data: e.data ?? {},
+        data: e.data,
         isPrivate: e.isPrivate ?? false,
         color: e.color ?? null,
     });
