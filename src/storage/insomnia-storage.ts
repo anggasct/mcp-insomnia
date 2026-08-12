@@ -1,9 +1,33 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { randomUUID } from 'node:crypto';
 import type { CollectionStructure, InsomniaWorkspace, InsomniaRequestGroup } from '../types/collection.js';
 import type { InsomniaRequest } from '../types/request.js';
 import type { InsomniaEnvironment } from '../types/environment.js';
+
+function newPairId(): string {
+    return `pair_${randomUUID().replace(/-/g, '')}`;
+}
+
+function isValidPairId(id: unknown): id is string {
+    return typeof id === 'string' && id.trim().length > 0;
+}
+
+/** Keep an existing pair id only when it is valid and unused in this list. */
+function ensureUniquePairId(id: unknown, used: Set<string>): string {
+    if (isValidPairId(id) && !used.has(id)) {
+        used.add(id);
+        return id;
+    }
+
+    let next = newPairId();
+    while (used.has(next)) {
+        next = newPairId();
+    }
+    used.add(next);
+    return next;
+}
 
 export class InsomniaStorage {
     private readonly insomniaDir: string;
@@ -58,7 +82,9 @@ export class InsomniaStorage {
         return `Insomnia data directory not found. Checked:\n${pathsList}\n\nSet INSOMNIA_DATA_DIR environment variable to specify a custom path.`;
     }
 
-    private readNeDB<T>(filename: string): T[] {
+    private readNeDB<T extends { _id?: string; modified?: number; $$deleted?: boolean }>(
+        filename: string,
+    ): T[] {
         const filePath = path.join(this.insomniaDir, filename);
         if (!fs.existsSync(filePath)) {
             return [];
@@ -67,15 +93,32 @@ export class InsomniaStorage {
         const content = fs.readFileSync(filePath, 'utf-8');
         const lines = content.split('\n').filter((line) => line.trim());
 
-        return lines
-            .map((line) => {
-                try {
-                    return JSON.parse(line) as T;
-                } catch {
-                    return null;
-                }
-            })
-            .filter((item): item is T => item !== null);
+        // NeDB append-only stores: multiple revisions per _id, and soft-deletes via $$deleted.
+        // Replay in file order — later live rows replace earlier ones for the same _id,
+        // and $$deleted removes the id (even if modified is missing or clock-skewed).
+        const latestById = new Map<string, T>();
+
+        for (const line of lines) {
+            let item: T;
+            try {
+                item = JSON.parse(line) as T;
+            } catch {
+                continue;
+            }
+
+            if (!item || typeof item !== 'object' || !item._id) {
+                continue;
+            }
+
+            if (item.$$deleted) {
+                latestById.delete(item._id);
+                continue;
+            }
+
+            latestById.set(item._id, item);
+        }
+
+        return Array.from(latestById.values());
     }
 
     private writeNeDB(filename: string, records: unknown[]): void {
@@ -360,7 +403,14 @@ export class InsomniaStorage {
         };
     }
 
-    private convertRequest(raw: InsomniaRequestRaw): InsomniaRequest {
+    convertRequest(raw: InsomniaRequestRaw): InsomniaRequest {
+        // Real Insomnia NeDB rows often store null for these fields.
+        const headers = Array.isArray(raw.headers) ? raw.headers : [];
+        const parameters = Array.isArray(raw.parameters) ? raw.parameters : [];
+        const body = raw.body && typeof raw.body === 'object' ? raw.body : {};
+        const authentication =
+            raw.authentication && typeof raw.authentication === 'object' ? raw.authentication : {};
+
         return {
             _id: raw._id,
             _type: 'request',
@@ -369,28 +419,35 @@ export class InsomniaStorage {
             description: raw.description,
             url: raw.url,
             method: raw.method as InsomniaRequest['method'],
-            headers: raw.headers.map((h) => ({
+            headers: headers.map((h) => ({
+                id: h.id,
                 name: h.name,
                 value: h.value,
                 description: h.description,
                 disabled: h.disabled,
             })),
-            parameters: raw.parameters.map((p) => ({
+            parameters: parameters.map((p) => ({
+                id: p.id,
                 name: p.name,
                 value: p.value,
                 disabled: p.disabled,
             })),
             body: {
-                mimeType: raw.body.mimeType,
-                text: raw.body.text,
+                mimeType: body.mimeType,
+                text: body.text,
             },
             authentication:
-                Object.keys(raw.authentication).length > 0
-                    ? (raw.authentication as unknown as InsomniaRequest['authentication'])
+                Object.keys(authentication).length > 0
+                    ? (authentication as unknown as InsomniaRequest['authentication'])
                     : undefined,
             modified: raw.modified,
             created: raw.created,
         };
+    }
+
+    getRequestById(requestId: string): InsomniaRequest | null {
+        const raw = this.getAllRequests().find((r) => r._id === requestId);
+        return raw ? this.convertRequest(raw) : null;
     }
 
     private convertRequestGroup(raw: InsomniaRequestGroupRaw): InsomniaRequestGroup {
@@ -412,7 +469,7 @@ export class InsomniaStorage {
             _type: 'environment',
             parentId: raw.parentId,
             name: raw.name,
-            data: raw.data,
+            data: raw.data && typeof raw.data === 'object' ? raw.data : {},
             isPrivate: raw.isPrivate,
             modified: raw.modified,
             created: raw.created,
@@ -436,18 +493,27 @@ export class InsomniaStorage {
                       text: request.body.text || '',
                   }
                 : {},
-            parameters: request.parameters.map((p) => ({
-                name: p.name,
-                value: p.value,
-                disabled: p.disabled || false,
-            })),
-            headers: request.headers.map((h) => ({
-                name: h.name,
-                value: h.value,
-                id: `pair_${String(Date.now())}`,
-                disabled: h.disabled || false,
-                description: h.description,
-            })),
+            // Insomnia React keys pair rows by `id`. Missing/duplicate/invalid ids
+            // break the UI with "Render Failure: Invalid array length".
+            parameters: (() => {
+                const used = new Set<string>();
+                return request.parameters.map((p) => ({
+                    id: ensureUniquePairId(p.id, used),
+                    name: p.name,
+                    value: p.value,
+                    disabled: p.disabled || false,
+                }));
+            })(),
+            headers: (() => {
+                const used = new Set<string>();
+                return request.headers.map((h) => ({
+                    name: h.name,
+                    value: h.value,
+                    id: ensureUniquePairId(h.id, used),
+                    disabled: h.disabled || false,
+                    description: h.description,
+                }));
+            })(),
             authentication: (request.authentication || {}) as Record<string, unknown>,
             metaSortKey: -Date.now(),
             isPrivate: false,
@@ -472,7 +538,7 @@ interface InsomniaWorkspaceRaw {
     scope: string;
 }
 
-interface InsomniaRequestRaw {
+export interface InsomniaRequestRaw {
     _id: string;
     type: 'Request';
     parentId: string;
@@ -482,23 +548,24 @@ interface InsomniaRequestRaw {
     name: string;
     description: string;
     method: string;
-    body: {
+    body?: {
         mimeType?: string;
         text?: string;
-    };
-    parameters: Array<{
+    } | null;
+    parameters?: Array<{
         name: string;
         value: string;
+        id?: string;
         disabled?: boolean;
-    }>;
-    headers: Array<{
+    }> | null;
+    headers?: Array<{
         name: string;
         value: string;
         id?: string;
         disabled?: boolean;
         description?: string;
-    }>;
-    authentication: Record<string, unknown>;
+    }> | null;
+    authentication?: Record<string, unknown> | null;
     metaSortKey: number;
     isPrivate: boolean;
     settingStoreCookies: boolean;
@@ -528,7 +595,7 @@ interface InsomniaEnvironmentRaw {
     modified: number;
     created: number;
     name: string;
-    data: Record<string, string | number | boolean>;
+    data?: Record<string, string | number | boolean> | null;
     isPrivate: boolean;
     metaSortKey: number;
 }

@@ -1,6 +1,6 @@
 {
   "name": "mcp-insomnia",
-  "version": "0.7.2",
+  "version": "0.7.4",
   "description": "MCP server for making HTTP requests and managing API collections",
   "main": "dist/index.js",
   "type": "module",
@@ -60,7 +60,7 @@
   "overrides": {
     "@hono/node-server": "^2.0.5",
     "esbuild": "^0.28.1",
-    "hono": "^4.12.25",
+    "hono": "^4.12.34",
     "httpsnippet": {
       "form-data": "^4.0.6"
     },
@@ -73,8 +73,8 @@
     "path-to-regexp": "^8.4.0",
     "picomatch": "^4.0.4",
     "qs": "^6.15.2",
-    "ip-address": "^10.2.0",
-    "fast-uri": "^3.1.4",
+    "ip-address": "^10.4.0",
+    "fast-uri": "^4.1.2",
     "js-yaml": "^4.3.0",
     "body-parser": "^2.3.0",
     "postcss": "^8.5.18"
