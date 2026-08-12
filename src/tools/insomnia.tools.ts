@@ -2,7 +2,48 @@ import { insomniaStorage } from '../storage/insomnia-storage.js';
 import { storage } from '../storage/storage.js';
 import { executeHttpRequest } from '../utils/request-executor.js';
 import { resolveInsomniaEnvironmentVariables } from '../utils/env-resolver.js';
+import { classifyCollection, type DiffEntry, type UpdateDiffEntry } from '../utils/diff.js';
+import { writeBackup, defaultBackupDir } from '../utils/backup.js';
 import type { Tool, ToolExecutionContext } from '../types/tool.js';
+import type { CollectionStructure } from '../types/collection.js';
+
+function touchedTargetResources(source: CollectionStructure, target: CollectionStructure | null): unknown[] {
+    if (!target) return [];
+    const ids = new Set<string>([
+        source.workspace._id,
+        ...source.folders.map((f) => f._id),
+        ...source.requests.map((r) => r._id),
+        ...source.environments.map((e) => e._id),
+    ]);
+    const out: unknown[] = [];
+    if (ids.has(target.workspace._id)) out.push(target.workspace);
+    for (const f of target.folders) if (ids.has(f._id)) out.push(f);
+    for (const r of target.requests) if (ids.has(r._id)) out.push(r);
+    for (const e of target.environments) if (ids.has(e._id)) out.push(e);
+    return out;
+}
+
+function resolveTargetProjectId(projectId: string | undefined): string {
+    if (projectId) return projectId;
+    const workspaces = insomniaStorage.getAllWorkspaces();
+    if (workspaces.length > 0) return workspaces[0].parentId;
+    return 'proj_default';
+}
+
+function diffSummary(c: {
+    toCreate: DiffEntry[];
+    toUpdate: UpdateDiffEntry[];
+    toDelete: DiffEntry[];
+    unchangedCount: number;
+}) {
+    return {
+        toCreate: c.toCreate.length,
+        toUpdate: c.toUpdate.length,
+        toDelete: c.toDelete.length,
+        unchanged: c.unchangedCount,
+    };
+}
+
 export const insomniaTools: Tool[] = [
     {
         name: 'list_insomnia_collections',
@@ -203,13 +244,25 @@ export const insomniaTools: Tool[] = [
             properties: {
                 collectionId: { type: 'string', description: 'MCP collection ID to export' },
                 projectId: { type: 'string', description: 'Insomnia project ID (optional, defaults to first project)' },
+                dryRun: {
+                    type: 'boolean',
+                    description:
+                        'When true, return the planned diff and backup plan without writing to Insomnia or creating a backup file.',
+                },
+                backup: {
+                    type: 'boolean',
+                    description:
+                        'When true, write an atomic timestamped backup of the Insomnia documents that would be overwritten before applying the sync. Backup failure aborts the sync.',
+                },
             },
             required: ['collectionId'],
         },
         handler: async (request) => {
-            const { collectionId, projectId } = request.params.arguments as {
+            const { collectionId, projectId, dryRun, backup } = request.params.arguments as {
                 collectionId: string;
                 projectId?: string;
+                dryRun?: boolean;
+                backup?: boolean;
             };
 
             if (!insomniaStorage.isInsomniaInstalled()) {
@@ -221,14 +274,60 @@ export const insomniaTools: Tool[] = [
                 throw new Error(`Collection with ID ${collectionId} not found in MCP storage`);
             }
 
-            let targetProjectId = projectId;
-            if (!targetProjectId) {
-                const workspaces = insomniaStorage.getAllWorkspaces();
-                if (workspaces.length > 0) {
-                    targetProjectId = workspaces[0].parentId;
-                } else {
-                    targetProjectId = 'proj_default';
-                }
+            const targetProjectId = resolveTargetProjectId(projectId);
+            const target = insomniaStorage.getCollection(collectionId);
+            const classification = classifyCollection(collection, target);
+
+            const baseResponse = {
+                collection: {
+                    id: collectionId,
+                    name: collection.workspace.name,
+                    requestCount: collection.requests.length,
+                    folderCount: collection.folders.length,
+                    environmentCount: collection.environments.length,
+                },
+            };
+
+            if (dryRun) {
+                const touchedCount = touchedTargetResources(collection, target).length;
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: JSON.stringify(
+                                {
+                                    success: true,
+                                    dryRun: true,
+                                    ...baseResponse,
+                                    summary: diffSummary(classification),
+                                    toCreate: classification.toCreate,
+                                    toUpdate: classification.toUpdate,
+                                    toDelete: classification.toDelete,
+                                    wouldBackup: backup
+                                        ? {
+                                              path: `${defaultBackupDir()}/backup-<timestamp>-${collectionId}.json`,
+                                              docCount: touchedCount,
+                                          }
+                                        : null,
+                                    warnings: classification.warnings,
+                                },
+                                null,
+                                2,
+                            ),
+                        },
+                    ],
+                };
+            }
+
+            let backupResult: { file: string; sha256: string; docCount: number; sizeBytes: number; retentionPurgedCount: number } | null = null;
+            if (backup) {
+                const resources = touchedTargetResources(collection, target);
+                backupResult = writeBackup({
+                    backupDir: defaultBackupDir(),
+                    collectionId,
+                    resources,
+                    now: new Date(),
+                });
             }
 
             insomniaStorage.saveWorkspace(collection.workspace, targetProjectId);
@@ -253,13 +352,64 @@ export const insomniaTools: Tool[] = [
                             {
                                 success: true,
                                 message: `Successfully synced collection "${collection.workspace.name}" to Insomnia. Restart Insomnia to see changes.`,
-                                collection: {
-                                    id: collectionId,
-                                    name: collection.workspace.name,
-                                    requestCount: collection.requests.length,
-                                    folderCount: collection.folders.length,
-                                    environmentCount: collection.environments.length,
-                                },
+                                ...baseResponse,
+                                ...(backupResult ? { backup: backupResult } : {}),
+                            },
+                            null,
+                            2,
+                        ),
+                    },
+                ],
+            };
+        },
+    },
+
+    {
+        name: 'preview_sync_to_insomnia',
+        description:
+            'Preview the effect of syncing a collection to Insomnia: classify documents into toCreate/toUpdate/toDelete vs the Insomnia target. Performs no writes.',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                collectionId: { type: 'string', description: 'MCP collection ID to preview' },
+                projectId: { type: 'string', description: 'Insomnia project ID (optional, defaults to first project)' },
+            },
+            required: ['collectionId'],
+        },
+        handler: async (request) => {
+            const { collectionId, projectId } = request.params.arguments as {
+                collectionId: string;
+                projectId?: string;
+            };
+
+            if (!insomniaStorage.isInsomniaInstalled()) {
+                throw new Error(insomniaStorage.getNotInstalledMessage());
+            }
+
+            const collection = storage.getCollection(collectionId);
+            if (!collection) {
+                throw new Error(`Collection with ID ${collectionId} not found in MCP storage`);
+            }
+
+            const targetProjectId = resolveTargetProjectId(projectId);
+            const target = insomniaStorage.getCollection(collectionId);
+            const classification = classifyCollection(collection, target);
+
+            return {
+                content: [
+                    {
+                        type: 'text',
+                        text: JSON.stringify(
+                            {
+                                success: true,
+                                collectionId,
+                                collectionName: collection.workspace.name,
+                                targetProjectId,
+                                summary: diffSummary(classification),
+                                toCreate: classification.toCreate,
+                                toUpdate: classification.toUpdate,
+                                toDelete: classification.toDelete,
+                                warnings: classification.warnings,
                             },
                             null,
                             2,

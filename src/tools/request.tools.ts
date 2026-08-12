@@ -376,16 +376,46 @@ export const requestTools: Tool[] = [
             type: 'object',
             properties: {
                 requestId: { type: 'string', description: 'ID of the request to delete' },
+                dryRun: {
+                    type: 'boolean',
+                    description:
+                        'When true, return the request that would be deleted without removing it. Never mutates state.',
+                },
             },
             required: ['requestId'],
         },
         handler: async (request) => {
-            const { requestId } = request.params.arguments as { requestId: string };
+            const { requestId, dryRun } = request.params.arguments as { requestId: string; dryRun?: boolean };
             const collections = storage.getAllCollections();
 
             for (const [collectionId, collection] of collections.entries()) {
-                const requestIndex = collection.requests.findIndex((r: InsomniaRequest) => r._id === requestId);
-                if (requestIndex !== -1) {
+                const target = collection.requests.find((r: InsomniaRequest) => r._id === requestId);
+                if (target) {
+                    if (dryRun) {
+                        return {
+                            content: [
+                                {
+                                    type: 'text',
+                                    text: JSON.stringify(
+                                        {
+                                            success: true,
+                                            dryRun: true,
+                                            wouldDelete: {
+                                                id: target._id,
+                                                name: target.name,
+                                                method: target.method,
+                                                url: target.url,
+                                                collectionId,
+                                            },
+                                        },
+                                        null,
+                                        2,
+                                    ),
+                                },
+                            ],
+                        };
+                    }
+                    const requestIndex = collection.requests.indexOf(target);
                     collection.requests.splice(requestIndex, 1);
                     storage.saveCollection(collectionId, collection);
                     return {
@@ -397,6 +427,21 @@ export const requestTools: Tool[] = [
                         ],
                     };
                 }
+            }
+
+            if (dryRun) {
+                return {
+                    content: [
+                        {
+                            type: 'text',
+                            text: JSON.stringify(
+                                { success: false, dryRun: true, error: 'not found', requestId },
+                                null,
+                                2,
+                            ),
+                        },
+                    ],
+                };
             }
 
             throw new Error(`Request with ID ${requestId} not found`);
