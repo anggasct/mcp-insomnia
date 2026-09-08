@@ -59,24 +59,26 @@
   },
   "overrides": {
     "@hono/node-server": "^2.0.5",
+    "@humanfs/node": "^0.16.8",
     "esbuild": "^0.28.1",
     "hono": "^4.12.34",
     "httpsnippet": {
       "form-data": "^4.0.6"
     },
     "minimatch@3.1.5": {
-      "brace-expansion": "^1.1.16"
+      "brace-expansion": "^1.1.18"
     },
     "minimatch@^10.2.2": {
-      "brace-expansion": "^5.0.8"
+      "brace-expansion": "^5.0.9"
     },
     "path-to-regexp": "^8.4.0",
     "picomatch": "^4.0.4",
-    "qs": "^6.15.2",
+    "qs": "^6.16.0",
     "ip-address": "^10.4.0",
-    "fast-uri": "^4.1.2",
-    "js-yaml": "^4.3.0",
+    "fast-uri": "^4.1.4",
+    "js-yaml": "^4.3.2",
     "body-parser": "^2.3.0",
-    "postcss": "^8.5.18"
+    "postcss": "^8.5.18",
+    "nanoid": "^3.3.18"
   }
 }
