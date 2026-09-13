@@ -61,7 +61,7 @@
     "@hono/node-server": "^2.0.5",
     "@humanfs/node": "^0.16.8",
     "esbuild": "^0.28.1",
-    "hono": "^4.12.34",
+    "hono": "^4.13.7",
     "httpsnippet": {
       "form-data": "^4.0.6"
     },
