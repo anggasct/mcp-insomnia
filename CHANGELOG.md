@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.0](https://github.com/anggasct/mcp-insomnia/compare/v0.7.4...v0.8.0) (2026-09-13)
+
+
+### Features
+
+* **sync:** add preview, dry-run, and backup for safe destructive ops ([#35](https://github.com/anggasct/mcp-insomnia/issues/35)) ([abb210f](https://github.com/anggasct/mcp-insomnia/commit/abb210fbd2ab19ef5a8a1f817df7d66707de9cca))
+
+
+### Bug Fixes
+
+* **deps:** bump hono override for 0.8.0 audit gate ([#38](https://github.com/anggasct/mcp-insomnia/issues/38)) ([70fec0b](https://github.com/anggasct/mcp-insomnia/commit/70fec0b3aa8a16af8655b0f2e55b64797de34239))
+* **deps:** bump overrides to resolve open security alerts ([#37](https://github.com/anggasct/mcp-insomnia/issues/37)) ([24c40db](https://github.com/anggasct/mcp-insomnia/commit/24c40dbe2832c732d562bec1a0d64a3bf7f4ba1a))
+
 ## [0.7.4](https://github.com/anggasct/mcp-insomnia/compare/v0.7.3...v0.7.4) (2026-08-04)
 
 ### Bug Fixes
