@@ -293,4 +293,133 @@ describe('InsomniaStorage NeDB hardening', () => {
         expect(converted.body).toEqual({ mimeType: undefined, text: undefined });
         expect(converted.authentication).toBeUndefined();
     });
+
+    it('preserves unmodeled fields, settings, and extra body keys when updating an existing request', () => {
+        const initialRaw = {
+            ...baseRequest,
+            _id: 'req_unmodeled',
+            modified: 100,
+            url: 'https://example.com/initial',
+            name: 'Initial Name',
+            preRequestScript: 'console.log("pre");',
+            afterResponseScript: 'console.log("post");',
+            pathParameters: [{ name: 'id', value: '123' }],
+            settingFollowRedirects: 'manual',
+            metaSortKey: -9999,
+            body: {
+                mimeType: 'application/json',
+                text: '{"init":true}',
+                fileName: 'payload.bin',
+            },
+        };
+
+        const storage = makeStorage({
+            requests: [initialRaw],
+        });
+
+        storage.saveRequest({
+            _id: 'req_unmodeled',
+            _type: 'request',
+            parentId: 'wrk_1',
+            name: 'Updated Name',
+            description: 'Updated Description',
+            url: 'https://example.com/updated',
+            method: 'POST',
+            headers: [{ name: 'Content-Type', value: 'application/json' }],
+            parameters: [{ name: 'filter', value: 'active' }],
+            body: {
+                mimeType: 'application/json',
+                text: '{"updated":true}',
+            },
+            modified: 200,
+            created: 1,
+        });
+
+        const raw = storage.getAllRequests().find((r) => r._id === 'req_unmodeled') as unknown as Record<
+            string,
+            unknown
+        >;
+        expect(raw).toBeDefined();
+        expect(raw.url).toBe('https://example.com/updated');
+        expect(raw.name).toBe('Updated Name');
+        expect(raw.description).toBe('Updated Description');
+        expect(raw.method).toBe('POST');
+        expect(raw.preRequestScript).toBe('console.log("pre");');
+        expect(raw.afterResponseScript).toBe('console.log("post");');
+        expect(raw.pathParameters).toEqual([{ name: 'id', value: '123' }]);
+        expect(raw.settingFollowRedirects).toBe('manual');
+        expect(raw.metaSortKey).toBe(-9999);
+        expect(raw.body).toEqual({
+            mimeType: 'application/json',
+            text: '{"updated":true}',
+            fileName: 'payload.bin',
+        });
+    });
+
+    it('appends a new raw row with current defaults when saving a non-existent request', () => {
+        const storage = makeStorage({});
+
+        storage.saveRequest({
+            _id: 'req_brand_new',
+            _type: 'request',
+            parentId: 'wrk_1',
+            name: 'Brand New',
+            url: 'https://example.com/brand-new',
+            method: 'GET',
+            headers: [],
+            parameters: [],
+            modified: 10,
+            created: 10,
+        });
+
+        const all = storage.getAllRequests();
+        expect(all).toHaveLength(1);
+        const raw = all[0];
+        expect(raw._id).toBe('req_brand_new');
+        expect(raw.url).toBe('https://example.com/brand-new');
+        expect(raw.settingFollowRedirects).toBe('global');
+        expect(raw.isPrivate).toBe(false);
+        expect(raw.metaSortKey).toBeLessThan(0);
+    });
+
+    it('leaves other rows in the same .db file untouched when updating a request', () => {
+        const otherRaw = {
+            ...baseRequest,
+            _id: 'req_other',
+            modified: 50,
+            url: 'https://example.com/other',
+            name: 'Other',
+            preRequestScript: 'console.log("other-pre");',
+            metaSortKey: -42,
+        };
+        const targetRaw = {
+            ...baseRequest,
+            _id: 'req_target',
+            modified: 10,
+            url: 'https://example.com/target',
+            name: 'Target',
+        };
+
+        const storage = makeStorage({
+            requests: [otherRaw, targetRaw],
+        });
+
+        storage.saveRequest({
+            _id: 'req_target',
+            _type: 'request',
+            parentId: 'wrk_1',
+            name: 'Target Updated',
+            url: 'https://example.com/target-updated',
+            method: 'GET',
+            headers: [],
+            parameters: [],
+            modified: 20,
+            created: 1,
+        });
+
+        const all = storage.getAllRequests();
+        expect(all).toHaveLength(2);
+        const untouched = all.find((r) => r._id === 'req_other') as unknown as Record<string, unknown>;
+        expect(untouched).toEqual(otherRaw);
+    });
 });

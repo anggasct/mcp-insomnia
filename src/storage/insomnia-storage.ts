@@ -244,7 +244,25 @@ export class InsomniaStorage {
         const index = existing.findIndex((r) => r._id === request._id);
 
         if (index >= 0) {
-            existing[index] = raw;
+            const existingRow = existing[index];
+            existing[index] = {
+                ...existingRow,
+                _id: raw._id,
+                type: raw.type,
+                parentId: raw.parentId,
+                modified: raw.modified,
+                name: raw.name,
+                description: raw.description,
+                url: raw.url,
+                method: raw.method,
+                headers: raw.headers,
+                parameters: raw.parameters,
+                authentication: raw.authentication,
+                body: {
+                    ...(existingRow.body && typeof existingRow.body === 'object' ? existingRow.body : {}),
+                    ...raw.body,
+                },
+            };
             this.writeNeDB('insomnia.Request.db', existing);
         } else {
             this.appendNeDB('insomnia.Request.db', raw);
