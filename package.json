@@ -37,9 +37,9 @@
     "dist"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "axios": "^1.18.0",
-    "httpsnippet": "^3.0.9",
+    "@modelcontextprotocol/sdk": "^1.32.1",
+    "axios": "^1.20.0",
+    "httpsnippet": "^3.0.10",
     "uuid": "^11.1.1"
   },
   "devDependencies": {
@@ -51,7 +51,7 @@
     "tsx": "^4.0.0",
     "typescript": "^5.0.0",
     "typescript-eslint": "^8.52.0",
-    "vitest": "^4.1.8",
+    "vitest": "^4.1.12",
     "husky": "^9.1.7"
   },
   "bin": {
@@ -66,16 +66,16 @@
       "form-data": "^4.0.6"
     },
     "minimatch@3.1.5": {
-      "brace-expansion": "^1.1.18"
+      "brace-expansion": "^1.1.21"
     },
     "minimatch@^10.2.2": {
-      "brace-expansion": "^5.0.9"
+      "brace-expansion": "^5.0.12"
     },
     "path-to-regexp": "^8.4.0",
     "picomatch": "^4.0.4",
     "qs": "^6.16.0",
-    "ip-address": "^10.4.0",
-    "fast-uri": "^4.1.4",
+    "ip-address": "^10.7.4",
+    "fast-uri": "^4.2.2",
     "js-yaml": "^4.3.2",
     "body-parser": "^2.3.0",
     "postcss": "^8.5.18",
