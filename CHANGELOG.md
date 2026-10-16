@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/anggasct/mcp-insomnia/compare/v0.8.0...v0.8.1) (2026-10-16)
+
+
+### Bug Fixes
+
+* **deps:** resolve open dependabot security alerts ([#40](https://github.com/anggasct/mcp-insomnia/issues/40)) ([b123a43](https://github.com/anggasct/mcp-insomnia/commit/b123a43847fc80b833a2f321c74de743561b2220))
+
 ## [0.8.0](https://github.com/anggasct/mcp-insomnia/compare/v0.7.4...v0.8.0) (2026-09-13)
 
 
