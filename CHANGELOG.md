@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.2](https://github.com/anggasct/mcp-insomnia/compare/v0.8.1...v0.8.2) (2026-10-16)
+
+
+### Bug Fixes
+
+* preserve preRequestScript and afterResponseScript on sync_to_insomnia ([#39](https://github.com/anggasct/mcp-insomnia/issues/39)) ([cc0423a](https://github.com/anggasct/mcp-insomnia/commit/cc0423ae9a7dbb774aa6c2ca346013402a10b106))
+
 ## [0.8.1](https://github.com/anggasct/mcp-insomnia/compare/v0.8.0...v0.8.1) (2026-10-16)
 
 
