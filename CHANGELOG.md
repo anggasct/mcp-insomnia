@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.3](https://github.com/anggasct/mcp-insomnia/compare/v0.8.2...v0.8.3) (2026-10-27)
+
+
+### Bug Fixes
+
+* **deps:** clear production audit advisories ([#44](https://github.com/anggasct/mcp-insomnia/issues/44)) ([0479018](https://github.com/anggasct/mcp-insomnia/commit/0479018e026405534cc9c7a150715a997da08f48))
+
 ## [0.8.2](https://github.com/anggasct/mcp-insomnia/compare/v0.8.1...v0.8.2) (2026-10-16)
 
 
