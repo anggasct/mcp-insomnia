@@ -61,6 +61,66 @@ describe('buildProcessedRequest', () => {
         const expected = Buffer.from('user:pass').toString('base64');
         expect(processed.headers['Authorization']).toBe(`Basic ${expected}`);
     });
+
+    it('substitutes {{ _.a }} with whitespace and leading underscore-dot prefix', () => {
+        const processed = buildProcessedRequest(makeRequest({ url: '{{ _.a }}' }), { a: 1 });
+        expect(processed.url).toBe('1');
+    });
+
+    it('substitutes {{_.a}} without whitespace', () => {
+        const processed = buildProcessedRequest(makeRequest({ url: '{{_.a}}' }), { a: 1 });
+        expect(processed.url).toBe('1');
+    });
+
+    it('substitutes {{a}} backward-compatibly', () => {
+        const processed = buildProcessedRequest(makeRequest({ url: '{{a}}' }), { a: 1 });
+        expect(processed.url).toBe('1');
+    });
+
+    it('substitutes {{ a }} with whitespace around bare variable', () => {
+        const processed = buildProcessedRequest(makeRequest({ url: '{{ a }}' }), { a: 1 });
+        expect(processed.url).toBe('1');
+    });
+
+    it('replaces the same variable multiple times in one string', () => {
+        const processed = buildProcessedRequest(makeRequest({ url: '{{ _.a }}/x/{{ _.a }}' }), { a: 1 });
+        expect(processed.url).toBe('1/x/1');
+    });
+
+    it('inserts replacement values containing $& and $1 literally', () => {
+        const processed = buildProcessedRequest(makeRequest({ url: '{{ _.val }}' }), {
+            val: 'literal $& and $1 end',
+        });
+        expect(processed.url).toBe('literal $& and $1 end');
+    });
+
+    it('leaves unknown variable tokens untouched', () => {
+        const processed = buildProcessedRequest(makeRequest({ url: '{{ _.missing }}/x' }), {});
+        expect(processed.url).toBe('{{ _.missing }}/x');
+    });
+
+    it('does not treat key with regex special characters as wildcard for other tokens', () => {
+        const processed = buildProcessedRequest(makeRequest({ url: '{{ _.aXb }}' }), {
+            'a.b': 'wildcard-replacement',
+        });
+        expect(processed.url).toBe('{{ _.aXb }}');
+    });
+
+    it('resolves {{ _.base_url }}/anything/62 and Authorization: Bearer {{ _.access_token }} together', () => {
+        const processed = buildProcessedRequest(
+            makeRequest({
+                url: '{{ _.base_url }}/anything/62',
+                headers: [{ name: 'Authorization', value: 'Bearer {{ _.access_token }}' }],
+            }),
+            {
+                base_url: 'https://api.example.com',
+                access_token: 'secret123',
+            },
+        );
+
+        expect(processed.url).toBe('https://api.example.com/anything/62');
+        expect(processed.headers['Authorization']).toBe('Bearer secret123');
+    });
 });
 
 describe('executeHttpRequest', () => {

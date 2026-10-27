@@ -20,12 +20,14 @@ export interface ProcessedRequestParts {
     body: string | Record<string, unknown> | undefined;
 }
 
+const TEMPLATE_TOKEN = /\{\{\s*(?:_\.)?([\w-]+)\s*\}\}/g;
+
 function substituteTemplate(value: string, environmentVariables: EnvironmentVariables): string {
-    let result = value;
-    for (const [key, envValue] of Object.entries(environmentVariables)) {
-        result = result.replace(new RegExp(`{{${key}}}`, 'g'), String(envValue));
-    }
-    return result;
+    return value.replace(TEMPLATE_TOKEN, (match, name: string) => {
+        return Object.prototype.hasOwnProperty.call(environmentVariables, name)
+            ? String(environmentVariables[name])
+            : match;
+    });
 }
 
 function applyAuthentication(
