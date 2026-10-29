@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.3](https://github.com/anggasct/mcp-insomnia/compare/v0.8.2...v0.8.3) (2026-10-29)
+
+
+### Bug Fixes
+
+* **deps:** clear production audit advisories ([#44](https://github.com/anggasct/mcp-insomnia/issues/44)) ([0479018](https://github.com/anggasct/mcp-insomnia/commit/0479018e026405534cc9c7a150715a997da08f48))
+* support Insomnia {{ _.var }} syntax in request template substitution ([#43](https://github.com/anggasct/mcp-insomnia/issues/43)) ([da14d90](https://github.com/anggasct/mcp-insomnia/commit/da14d9070675d30274af3f5ee4c1fad362088690))
+
 ## [0.8.2](https://github.com/anggasct/mcp-insomnia/compare/v0.8.1...v0.8.2) (2026-10-16)
 
 
